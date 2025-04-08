@@ -21,6 +21,5 @@ fun ProfileScreen() {
             "Profile Screen",
             style = TextStyle(fontSize = 24.sp, color = Color.White, fontFamily = LocalPoppinsFont.current)
         )
-        // Your Profile screen content here
     }
 }
