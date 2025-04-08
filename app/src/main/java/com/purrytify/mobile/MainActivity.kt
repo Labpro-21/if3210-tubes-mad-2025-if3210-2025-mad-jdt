@@ -11,7 +11,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,19 +41,29 @@ class MainActivity : ComponentActivity() {
         setContent {
             PurrytifyTheme {
                 val poppinsFontFamily = rememberPoppinsFontFamily()
+                var showSplashScreen by remember { mutableStateOf(true) }
 
                 CompositionLocalProvider(LocalPoppinsFont provides poppinsFontFamily) {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        containerColor = Color.Black
-                    ) { innerPadding ->
-                        NewSongsContainer(
-                            modifier = Modifier.padding(innerPadding)
-                        )
+                    if (showSplashScreen) {
+                        SplashScreen(onSplashScreenFinish = { showSplashScreen = false })
+                    } else {
+                        MainContent()
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun MainContent() {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Black
+    ) { innerPadding ->
+        NewSongsContainer(
+            modifier = Modifier.padding(innerPadding)
+        )
     }
 }
 
@@ -74,7 +88,6 @@ fun rememberPoppinsFontFamily(): FontFamily {
     }
 }
 
-
 @Composable
 fun NewSongsContainer(modifier: Modifier = Modifier) {
     val poppinsFontFamily = LocalPoppinsFont.current
@@ -91,12 +104,3 @@ fun NewSongsContainer(modifier: Modifier = Modifier) {
         )
     }
 }
-
-
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview() {
-//    PurrytifyTheme {
-//        NewSongsContainer()
-//    }
-//}
