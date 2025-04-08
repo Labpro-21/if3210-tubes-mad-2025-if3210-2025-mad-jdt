@@ -24,10 +24,19 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import com.purrytify.mobile.ui.screens.SplashScreen
-import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.purrytify.mobile.ui.BottomNavigationBar
+import com.purrytify.mobile.ui.BottomNavItem
+import com.purrytify.mobile.ui.HomeScreen
+import com.purrytify.mobile.ui.ProfileScreen
+import com.purrytify.mobile.ui.YourLibraryScreen
+import com.purrytify.mobile.ui.screens.SplashScreen
+import com.purrytify.mobile.ui.theme.PurrytifyTheme
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -40,7 +49,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PurrytifyTheme {
-                val poppinsFontFamily = rememberPoppinsFontFamily()
+                val poppinsFontFamily: FontFamily = rememberPoppinsFontFamily()
                 var showSplashScreen by remember { mutableStateOf(true) }
 
                 CompositionLocalProvider(LocalPoppinsFont provides poppinsFontFamily) {
@@ -53,54 +62,76 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    @Composable
+    fun rememberPoppinsFontFamily(): FontFamily {
+        val context = LocalContext.current
+        val provider = GoogleFont.Provider(
+            providerAuthority = "com.google.android.gms.fonts",
+            providerPackage = "com.google.android.gms",
+            certificates = R.array.com_google_android_gms_fonts_certs
+        )
+        val fontName = GoogleFont("Poppins")
+
+        return remember {
+            FontFamily(
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Light
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Normal
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Medium
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.SemiBold
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Bold
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.ExtraBold
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Black
+                )
+            )
+        }
+    }
 }
 
 @Composable
 fun MainContent() {
+    val navController: NavHostController = rememberNavController() // Explicit type
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black
+        containerColor = Color.Black,
+        bottomBar = { BottomNavigationBar(navController = navController) }
     ) { innerPadding ->
-        NewSongsContainer(
+        NavHost(
+            navController = navController,
+            startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
-        )
-    }
-}
-
-@Composable
-fun rememberPoppinsFontFamily(): FontFamily {
-    val context = LocalContext.current
-    val provider = GoogleFont.Provider(
-        providerAuthority = "com.google.android.gms.fonts",
-        providerPackage = "com.google.android.gms",
-        certificates = R.array.com_google_android_gms_fonts_certs
-    )
-    val fontName = GoogleFont("Poppins")
-
-    return remember {
-        FontFamily(
-            Font(
-                googleFont = fontName,
-                fontProvider = provider,
-                weight = FontWeight.W600
-            ),
-        )
-    }
-}
-
-@Composable
-fun NewSongsContainer(modifier: Modifier = Modifier) {
-    val poppinsFontFamily = LocalPoppinsFont.current
-
-    Column(modifier = modifier.padding(horizontal = 16.dp)) {
-        Text(
-            text = "New Songs",
-            style = TextStyle(
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.W600,
-                fontFamily = poppinsFontFamily
-            )
-        )
+        ) {
+            composable(BottomNavItem.Home.route) { HomeScreen() }
+            composable(BottomNavItem.Library.route) { YourLibraryScreen() }
+            composable(BottomNavItem.Profile.route) { ProfileScreen() }
+        }
     }
 }
