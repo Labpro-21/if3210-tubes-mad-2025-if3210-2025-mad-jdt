@@ -21,6 +21,5 @@ fun HomeScreen() {
             "Home Screen",
             style = TextStyle(fontSize = 24.sp, color = Color.White, fontFamily = LocalPoppinsFont.current)
         )
-        // Your Home screen content here
     }
 }
