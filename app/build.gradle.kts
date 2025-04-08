@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.purrytify.mobile"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.purrytify.mobile"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
