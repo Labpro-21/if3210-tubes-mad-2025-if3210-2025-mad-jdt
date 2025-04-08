@@ -31,6 +31,7 @@ import com.purrytify.mobile.ui.screens.HomeScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
+import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 
 // Composition Local for Poppins Font
@@ -126,7 +127,8 @@ fun MainContent() {
         ) {
             composable(BottomNavItem.Home.route) { HomeScreen() }
             composable(BottomNavItem.Library.route) { YourLibraryScreen() }
-            composable(BottomNavItem.Profile.route) { ProfileScreen() }
+            composable(BottomNavItem.Profile.route) { LoginScreen()}
+
         }
     }
 }
