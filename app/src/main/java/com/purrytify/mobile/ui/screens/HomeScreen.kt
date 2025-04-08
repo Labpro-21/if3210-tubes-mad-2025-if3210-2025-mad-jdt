@@ -1,4 +1,4 @@
-package com.purrytify.mobile.ui
+package com.purrytify.mobile.ui.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,12 +13,12 @@ import androidx.compose.ui.unit.sp
 import com.purrytify.mobile.LocalPoppinsFont
 
 @Composable
-fun ProfileScreen() {
+fun HomeScreen() {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
     ) {
         Text(
-            "Profile Screen",
+            "Home Screen",
             style = TextStyle(fontSize = 24.sp, color = Color.White, fontFamily = LocalPoppinsFont.current)
         )
     }

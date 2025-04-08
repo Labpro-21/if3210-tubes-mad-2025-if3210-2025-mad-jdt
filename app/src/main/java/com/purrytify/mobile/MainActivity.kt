@@ -27,9 +27,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.BottomNavItem
-import com.purrytify.mobile.ui.HomeScreen
-import com.purrytify.mobile.ui.ProfileScreen
-import com.purrytify.mobile.ui.YourLibraryScreen
+import com.purrytify.mobile.ui.screens.HomeScreen
+import com.purrytify.mobile.ui.screens.ProfileScreen
+import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 
