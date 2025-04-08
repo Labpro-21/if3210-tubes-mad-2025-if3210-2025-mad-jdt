@@ -31,7 +31,6 @@ fun SplashScreen(onSplashScreenFinish: () -> Unit) {
         label = "Splash Alpha Animation"
     )
 
-    // Trigger the animation and navigate after delay
     LaunchedEffect(key1 = true) {
         startAnimation = true
         delay(2000)
@@ -49,12 +48,11 @@ fun Splash(alpha: Float) {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        // Using the image from resources
         Image(
             painter = painterResource(id = R.drawable.splash_logo),
             contentDescription = "Purrytify Logo",
             modifier = Modifier
-                .size(240.dp)  // Adjust size as needed for your image
+                .size(180.dp)
                 .alpha(alpha)
         )
     }
