@@ -115,20 +115,24 @@ class MainActivity : ComponentActivity() {
 fun MainContent() {
     val navController: NavHostController = rememberNavController()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black,
-        bottomBar = { BottomNavigationBar(navController = navController) }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = BottomNavItem.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(BottomNavItem.Home.route) { HomeScreen() }
-            composable(BottomNavItem.Library.route) { YourLibraryScreen() }
-            composable(BottomNavItem.Profile.route) { LoginScreen()}
-
-        }
+//    Scaffold(
+//        modifier = Modifier.fillMaxSize(),
+//        containerColor = Color.Black,
+//        bottomBar = { BottomNavigationBar(navController = navController) }
+//    ) { innerPadding ->
+//        NavHost(
+//            navController = navController,
+//            startDestination = BottomNavItem.Home.route,
+//            modifier = Modifier.padding(innerPadding)
+//        ) {
+//            composable(BottomNavItem.Home.route) { HomeScreen() }
+//            composable(BottomNavItem.Library.route) { YourLibraryScreen() }
+//            composable(BottomNavItem.Profile.route) { LoginScreen()}
+//
+//        }
+//    }
+    NavHost(navController = navController, startDestination = "splash") {
+        composable("splash") { SplashScreen(onSplashScreenFinish = { navController.navigate("login") }) }
+        composable("login") { LoginScreen() }
     }
 }
