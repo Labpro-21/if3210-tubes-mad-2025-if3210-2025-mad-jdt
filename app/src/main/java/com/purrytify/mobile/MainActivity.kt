@@ -11,6 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope // <<< Import CoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,6 +36,7 @@ import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
+import kotlinx.coroutines.launch // <<< Import launch
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -49,7 +51,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // --- Dependencies ---
-        // Create these once. Consider Dependency Injection (Hilt) for a real app.
         val tokenManager = TokenManager(applicationContext)
         val retrofit = ApiClient.buildRetrofit()
         val authService = ApiClient.createAuthService(retrofit)
@@ -64,7 +65,6 @@ class MainActivity : ComponentActivity() {
 
                     val navController = rememberNavController()
 
-                    // Determine initial state (use ViewModel for complex/async checks)
                     val startDestination = remember {
                         if (checkInitialAuthState(tokenManager)) "main" else "auth"
                     }
@@ -84,7 +84,6 @@ class MainActivity : ComponentActivity() {
                                             "MainActivity",
                                             "Splash finished, navigating to login"
                                         )
-                                        // Navigate to login, clearing splash
                                         navController.navigate("login") {
                                             popUpTo("splash") { inclusive = true }
                                         }
@@ -93,7 +92,6 @@ class MainActivity : ComponentActivity() {
                             }
                             composable("login") {
                                 Log.d("MainActivity", "Navigating to LoginScreen")
-                                // Pass dependencies and navController
                                 LoginScreen(
                                     authRepository = authRepository,
                                     navController = navController
@@ -104,10 +102,9 @@ class MainActivity : ComponentActivity() {
                         // Main Application Flow Graph
                         composable("main") {
                             Log.d("MainActivity", "Navigating to MainContent (main graph)")
-                            // Pass dependencies and navController for logout
                             MainContent(
                                 navController = navController,
-                                tokenManager = tokenManager // Example dependency needed for logout
+                                tokenManager = tokenManager
                             )
                         }
                     }
@@ -117,11 +114,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Simple synchronous check (replace with ViewModel/async logic if needed)
+    // Simple synchronous check using the blocking getAccessToken
     private fun checkInitialAuthState(tokenManager: TokenManager): Boolean {
-        val hasToken = tokenManager.getAccessToken() != null
+        val hasToken = tokenManager.getAccessToken() != null // Use the blocking version here
         Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
-        // Add more robust validation if required (e.g., check expiry)
         return hasToken
     }
 
@@ -154,26 +150,41 @@ class MainActivity : ComponentActivity() {
 fun MainContent(
     navController: NavHostController, // Top-level controller for logout
     tokenManager: TokenManager // Pass needed dependencies
-    // Add other dependencies like AuthRepository if screens need them
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
+    val scope = rememberCoroutineScope() // <<< Get coroutine scope
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black, // Or your theme background
+        containerColor = Color.Black,
         bottomBar = {
             BottomNavigationBar(navController = nestedNavController)
         }
     ) { innerPadding ->
         NavHost(
             navController = nestedNavController, // Use nested controller here
-            startDestination = BottomNavItem.Home.route, // Default screen after login
+            startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
             composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
             composable(BottomNavItem.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(
+                    // --- Implement Logout Logic Here ---
+                    onLogout = {
+                        scope.launch { // <<< Launch coroutine
+                            Log.d("MainContent", "Logout initiated: Clearing tokens.")
+                            tokenManager.clearTokens() // <<< Clear tokens
+                            Log.d("MainContent", "Tokens cleared, navigating to auth.")
+                            // Navigate back to auth flow, clearing the main flow stack
+                            navController.navigate("auth") { // <<< Use top-level controller
+                                popUpTo("main") { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                    // --- End Logout Logic ---
+                )
             }
         }
     }
