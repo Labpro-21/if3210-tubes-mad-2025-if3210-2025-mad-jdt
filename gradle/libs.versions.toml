@@ -15,6 +15,7 @@ composeBom = "2024.09.00"
 lifecycleViewmodelCompose = "2.8.7"
 materialIconsExtended = "1.7.8"
 retrofit = "2.11.0"
+paletteKtxVersion = "1.0.0"
 uiTextGoogleFonts = "1.7.8"
 navigationCompose = "2.8.9"
 
@@ -24,10 +25,11 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version = "1.2.0" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
-gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+androidx-palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = "paletteKtxVersion" }
 androidx-ui-text-google-fonts = { module = "androidx.compose.ui:ui-text-google-fonts", version.ref = "uiTextGoogleFonts" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroid" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
