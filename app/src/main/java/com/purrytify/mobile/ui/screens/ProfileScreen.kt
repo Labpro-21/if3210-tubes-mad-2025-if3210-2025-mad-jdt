@@ -1,13 +1,37 @@
 package com.purrytify.mobile.ui.screens
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,14 +45,16 @@ import androidx.compose.ui.unit.sp
 import com.purrytify.mobile.R
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    onLogout: () -> Unit // <<< ADDED: Callback function parameter
+) {
     var showEditModal by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-    ){
+    ) {
         // Main profile content
         Box(
             modifier = Modifier
@@ -103,6 +129,23 @@ fun ProfileScreen() {
                     StatItem("32", "LIKED")
                     StatItem("50", "LISTENED")
                 }
+
+                // --- ADDED: Logout Button ---
+                Spacer(modifier = Modifier.height(30.dp)) // Space before logout
+                Button(
+                    onClick = onLogout, // Call the passed-in lambda
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Red.copy(alpha = 0.6f) // Example color
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                        .height(36.dp)
+                ) {
+                    Text("Log Out", color = Color.White)
+                }
+                // --- End Logout Button ---
+
             }
         }
 
@@ -124,6 +167,7 @@ fun ProfileScreen() {
     }
 }
 
+// --- EditProfileModal (Unchanged from your version) ---
 @Composable
 fun EditProfileModal(onDismiss: () -> Unit, onSave: () -> Unit) {
     Box(
@@ -288,6 +332,7 @@ fun EditProfileModal(onDismiss: () -> Unit, onSave: () -> Unit) {
     }
 }
 
+// --- StatItem (Unchanged from your version) ---
 @Composable
 fun StatItem(value: String, label: String) {
     Column(

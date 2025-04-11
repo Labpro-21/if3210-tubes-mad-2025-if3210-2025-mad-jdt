@@ -1,6 +1,7 @@
 package com.purrytify.mobile
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -9,10 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope // <<< Import CoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,14 +23,20 @@ import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import com.purrytify.mobile.ui.BottomNavigationBar
+import com.purrytify.mobile.api.ApiClient
+import com.purrytify.mobile.data.AuthRepository
+import com.purrytify.mobile.data.TokenManager
 import com.purrytify.mobile.ui.BottomNavItem
+import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.screens.HomeScreen
+import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
-import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
+import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
+import kotlinx.coroutines.launch // <<< Import launch
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -39,23 +44,81 @@ val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
 }
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d("MainActivity", "onCreate: MainActivity is starting!")
         enableEdgeToEdge()
+
+        // --- Dependencies ---
+        val tokenManager = TokenManager(applicationContext)
+        val retrofit = ApiClient.buildRetrofit()
+        val authService = ApiClient.createAuthService(retrofit)
+        val authRepository = AuthRepository(tokenManager, authService)
+        // --- End Dependencies ---
+
         setContent {
+            Log.d("MainActivity", "setContent: Setting up Main UI")
             PurrytifyTheme {
                 val poppinsFontFamily: FontFamily = rememberPoppinsFontFamily()
-                var showSplashScreen by remember { mutableStateOf(true) }
-
                 CompositionLocalProvider(LocalPoppinsFont provides poppinsFontFamily) {
-                    if (showSplashScreen) {
-                        SplashScreen(onSplashScreenFinish = { showSplashScreen = false })
-                    } else {
-                        MainContent()
+
+                    val navController = rememberNavController()
+
+                    val startDestination = remember {
+                        if (checkInitialAuthState(tokenManager)) "main" else "auth"
+                    }
+                    Log.d("MainActivity", "Initial start destination: $startDestination")
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = startDestination
+                    ) {
+
+                        // Authentication Flow Graph
+                        navigation(startDestination = "splash", route = "auth") {
+                            composable("splash") {
+                                SplashScreen(
+                                    onSplashScreenFinish = {
+                                        Log.d(
+                                            "MainActivity",
+                                            "Splash finished, navigating to login"
+                                        )
+                                        navController.navigate("login") {
+                                            popUpTo("splash") { inclusive = true }
+                                        }
+                                    }
+                                )
+                            }
+                            composable("login") {
+                                Log.d("MainActivity", "Navigating to LoginScreen")
+                                LoginScreen(
+                                    authRepository = authRepository,
+                                    navController = navController
+                                )
+                            }
+                        }
+
+                        // Main Application Flow Graph
+                        composable("main") {
+                            Log.d("MainActivity", "Navigating to MainContent (main graph)")
+                            MainContent(
+                                navController = navController,
+                                tokenManager = tokenManager
+                            )
+                        }
                     }
                 }
             }
+            Log.d("MainActivity", "onCreate: MainActivity setup finished.")
         }
+    }
+
+    // Simple synchronous check using the blocking getAccessToken
+    private fun checkInitialAuthState(tokenManager: TokenManager): Boolean {
+        val hasToken = tokenManager.getAccessToken() != null // Use the blocking version here
+        Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
+        return hasToken
     }
 
     @Composable
@@ -70,63 +133,59 @@ class MainActivity : ComponentActivity() {
 
         return remember {
             FontFamily(
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Light
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Normal
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Medium
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.SemiBold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Bold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.ExtraBold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Black
-                )
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Light),
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Normal),
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Medium),
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.SemiBold),
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Bold),
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.ExtraBold),
+                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Black)
             )
         }
     }
 }
 
+// --- Main Authenticated Content Composable ---
 @Composable
-fun MainContent() {
-    val navController: NavHostController = rememberNavController()
+fun MainContent(
+    navController: NavHostController, // Top-level controller for logout
+    tokenManager: TokenManager // Pass needed dependencies
+) {
+    val nestedNavController = rememberNavController() // Controller for bottom nav sections
+    val scope = rememberCoroutineScope() // <<< Get coroutine scope
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Black,
-        bottomBar = { BottomNavigationBar(navController = navController) }
+        bottomBar = {
+            BottomNavigationBar(navController = nestedNavController)
+        }
     ) { innerPadding ->
         NavHost(
-            navController = navController,
+            navController = nestedNavController, // Use nested controller here
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(BottomNavItem.Home.route) { HomeScreen() }
-            composable(BottomNavItem.Library.route) { YourLibraryScreen() }
-            composable(BottomNavItem.Profile.route) { ProfileScreen() }
+            composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
+            composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
+            composable(BottomNavItem.Profile.route) {
+                ProfileScreen(
+                    // --- Implement Logout Logic Here ---
+                    onLogout = {
+                        scope.launch { // <<< Launch coroutine
+                            Log.d("MainContent", "Logout initiated: Clearing tokens.")
+                            tokenManager.clearTokens() // <<< Clear tokens
+                            Log.d("MainContent", "Tokens cleared, navigating to auth.")
+                            // Navigate back to auth flow, clearing the main flow stack
+                            navController.navigate("auth") { // <<< Use top-level controller
+                                popUpTo("main") { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                    // --- End Logout Logic ---
+                )
+            }
         }
     }
 }
