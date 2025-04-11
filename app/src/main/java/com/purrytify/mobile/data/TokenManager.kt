@@ -3,16 +3,14 @@ package com.purrytify.mobile.data
 import android.content.Context
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
-import javax.inject.Inject
 
 private val Context.dataStore by preferencesDataStore("auth_prefs")
 
-class TokenManager @Inject constructor(@ApplicationContext private val context: Context) {
+class TokenManager(private val context: Context) {
     companion object {
         val ACCESS_TOKEN_KEY = stringPreferencesKey("ACCESS_TOKEN")
         val REFRESH_TOKEN_KEY = stringPreferencesKey("REFRESH_TOKEN")
