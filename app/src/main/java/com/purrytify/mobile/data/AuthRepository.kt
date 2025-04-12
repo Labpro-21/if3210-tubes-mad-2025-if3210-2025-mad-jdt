@@ -3,11 +3,12 @@ package com.purrytify.mobile.data
 import android.util.Log
 import com.purrytify.mobile.api.AuthService
 import com.purrytify.mobile.api.LoginRequest
+import com.purrytify.mobile.api.ProfileResponse
 import com.purrytify.mobile.api.RefreshTokenRequest
 import com.purrytify.mobile.api.RefreshTokenResponse
-import java.lang.Exception
+import kotlinx.coroutines.flow.first
 
-class AuthRepository (  // Remove @Inject
+class AuthRepository(
     private val tokenManager: TokenManager,
     private val authService: AuthService
 ) {
@@ -21,14 +22,17 @@ class AuthRepository (  // Remove @Inject
                 val tokens = response.body()
                 if (tokens != null) {
                     Log.d("AuthRepository", "Login successful, saving tokens")
-                    tokenManager.saveTokens(tokens.access, tokens.refresh)
+                    tokenManager.saveTokens(tokens.accessToken, tokens.refreshToken)
                     true
                 } else {
                     Log.e("AuthRepository", "Login failed: Response body is null")
                     false
                 }
             } else {
-                Log.e("AuthRepository", "Login failed: Response not successful, code: ${response.code()}, message: ${response.message()}")
+                Log.e(
+                    "AuthRepository",
+                    "Login failed: Response not successful, code: ${response.code()}, message: ${response.message()}"
+                )
                 false
             }
         } catch (e: Exception) {
@@ -52,6 +56,33 @@ class AuthRepository (  // Remove @Inject
             response.body()
         } else {
             null
+        }
+    }
+
+    suspend fun getProfile(): Result<ProfileResponse> {
+        val token = tokenManager.accessToken.first()
+        if (token == null) {
+            Log.w("AuthRepository", "Cannot get profile, access token is null.")
+            return Result.failure(Exception("User not logged in"))
+        }
+        Log.d("AuthRepository", "Fetching profile with token: Bearer $token")
+        return try {
+            val response = authService.getProfile("Bearer $token")
+            if (response.isSuccessful && response.body() != null) {
+                Log.d("AuthRepository", "Profile fetched successfully: ${response.body()}")
+                Result.success(response.body()!!)
+            } else {
+                Log.e(
+                    "AuthRepository",
+                    "Get profile failed: Code: ${response.code()}, Message: ${response.message()}, Body: ${
+                        response.errorBody()?.string()
+                    }"
+                )
+                Result.failure(Exception("Failed to fetch profile: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "Exception during getProfile: ${e.message}", e)
+            Result.failure(e)
         }
     }
 }

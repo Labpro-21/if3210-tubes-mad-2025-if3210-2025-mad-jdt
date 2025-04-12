@@ -11,7 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope // <<< Import CoroutineScope
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,7 +37,7 @@ import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
-import kotlinx.coroutines.launch // <<< Import launch
+import kotlinx.coroutines.launch
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -104,7 +105,8 @@ class MainActivity : ComponentActivity() {
                             Log.d("MainActivity", "Navigating to MainContent (main graph)")
                             MainContent(
                                 navController = navController,
-                                tokenManager = tokenManager
+                                tokenManager = tokenManager,
+                                authRepository = authRepository
                             )
                         }
                     }
@@ -149,10 +151,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainContent(
     navController: NavHostController, // Top-level controller for logout
-    tokenManager: TokenManager // Pass needed dependencies
+    tokenManager: TokenManager, // Pass needed dependencies
+    authRepository: AuthRepository // Pass the repository instance
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
-    val scope = rememberCoroutineScope() // <<< Get coroutine scope
+    val scope = rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -170,20 +173,16 @@ fun MainContent(
             composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
             composable(BottomNavItem.Profile.route) {
                 ProfileScreen(
-                    // --- Implement Logout Logic Here ---
+                    authRepository = authRepository, // Pass the repository instance
                     onLogout = {
-                        scope.launch { // <<< Launch coroutine
-                            Log.d("MainContent", "Logout initiated: Clearing tokens.")
-                            tokenManager.clearTokens() // <<< Clear tokens
-                            Log.d("MainContent", "Tokens cleared, navigating to auth.")
-                            // Navigate back to auth flow, clearing the main flow stack
-                            navController.navigate("auth") { // <<< Use top-level controller
-                                popUpTo("main") { inclusive = true }
+                        scope.launch { // Use the scope obtained from rememberCoroutineScope()
+                            authRepository.logout()
+                            navController.navigate("auth") { // Navigate back to auth flow
+                                popUpTo("main") { inclusive = true } // Clear main backstack
                                 launchSingleTop = true
                             }
                         }
                     }
-                    // --- End Logout Logic ---
                 )
             }
         }
