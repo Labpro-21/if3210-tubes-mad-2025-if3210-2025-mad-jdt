@@ -55,7 +55,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,13 +71,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.purrytify.mobile.LocalPoppinsFont
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.room.LocalSong
-import com.purrytify.mobile.models.Song
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.launch
 import java.io.File
@@ -172,51 +168,6 @@ fun YourLibraryScreen() {
         }
     }
 
-    val allSongs = remember {
-        mutableStateListOf(
-            Song(
-                "1",
-                "Starboy",
-                "The Weeknd, Daft Punk",
-                "https://example.com/cover1.jpg",
-                "https://example.com/song1.mp3",
-                false
-            ),
-            Song(
-                "2",
-                "Here Comes The Sun",
-                "The Beatles",
-                "https://example.com/cover2.jpg",
-                "https://example.com/song2.mp3",
-                true
-            ),
-            Song(
-                "3",
-                "Midnight Pretenders",
-                "Tomoko Aran",
-                "https://example.com/cover3.jpg",
-                "https://example.com/song3.mp3",
-                false
-            ),
-            Song(
-                "4",
-                "Violent Crimes",
-                "Kanye West",
-                "https://example.com/cover4.jpg",
-                "https://example.com/song4.mp3",
-                true
-            ),
-            Song(
-                "5",
-                "DENIAL IS A RIVER",
-                "Doechii",
-                "https://example.com/cover5.jpg",
-                "https://example.com/song5.mp3",
-                false
-            )
-        )
-    }
-
     val localSongViewModel: LocalSongViewModel = viewModel()
     val localSongs by localSongViewModel.allSongs.collectAsState()
     val likedLocalSongs by localSongViewModel.likedSongs.collectAsState()
@@ -264,6 +215,7 @@ fun YourLibraryScreen() {
     var artistName by remember { mutableStateOf("") }
     var songDuration by remember { mutableStateOf("--:--") }
     var isEditMode by remember { mutableStateOf(false) }
+    var selectedTabIndex by remember { mutableStateOf(0) }
 
     val scope = rememberCoroutineScope()
 
@@ -321,14 +273,8 @@ fun YourLibraryScreen() {
         }
     }
 
-    val likedSongs = remember { allSongs.filter { it.isLiked } }
-    var selectedTabIndex by remember { mutableStateOf(0) }
-    var showSongSourceTabs by remember { mutableStateOf(false) }
-    var songSourceTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("All", "Liked")
-    val tabIndex = selectedTabIndex
     var showBottomSheet by remember { mutableStateOf(false) }
-    var showOptionsMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -381,45 +327,6 @@ fun YourLibraryScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = { songSourceTabIndex = 0 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (songSourceTabIndex == 0) Color(0xFF1DB954) else Color.DarkGray,
-                    contentColor = if (songSourceTabIndex == 0) Color.Black else Color.White
-                ),
-                shape = RoundedCornerShape(45.dp),
-                modifier = Modifier.size(90.dp, 32.dp)
-            ) {
-                Text(
-                    text = "Remote",
-                    fontSize = 12.sp
-                )
-            }
-
-            Button(
-                onClick = { songSourceTabIndex = 1 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (songSourceTabIndex == 1) Color(0xFF1DB954) else Color.DarkGray,
-                    contentColor = if (songSourceTabIndex == 1) Color.Black else Color.White
-                ),
-                shape = RoundedCornerShape(45.dp),
-                modifier = Modifier.size(70.dp, 32.dp)
-            ) {
-                Text(
-                    text = "Local",
-                    fontSize = 12.sp
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
                 onClick = { selectedTabIndex = 0 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedTabIndex == 0) Color(0xFF1DB954) else Color.DarkGray,
@@ -458,7 +365,7 @@ fun YourLibraryScreen() {
                 .background(color = Color.DarkGray)
         )
 
-        if (isLoading && songSourceTabIndex == 1) {
+        if (isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -487,70 +394,49 @@ fun YourLibraryScreen() {
             }
         }
 
-        if (songSourceTabIndex == 0) {
-            AndroidView(
-                factory = { ctx ->
-                    RecyclerView(ctx).apply {
-                        layoutManager = LinearLayoutManager(ctx)
-                        clipToPadding = false
-                    }
-                },
-                update = { recyclerView ->
-                    val songsToShow = if (selectedTabIndex == 0) allSongs else likedSongs
-                    recyclerView.adapter = SongsAdapter(songsToShow) { song ->
-                    }
-                },
+        val songsToShow = if (selectedTabIndex == 0) localSongs else likedLocalSongs
+
+        if (songsToShow.isEmpty() && !isLoading) {
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 18.dp, vertical = 16.dp)
-            )
-        } else if (songSourceTabIndex == 1) {
-            val songsToShow = if (selectedTabIndex == 0) localSongs else likedLocalSongs
-
-            if (songsToShow.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp),
-                    contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(top = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-//                        Icon(
-//                            painter = painterResource(id = R.drawable.ic_music),
-//                            contentDescription = "No Songs",
-//                            tint = Color.Gray,
-//                            modifier = Modifier.size(64.dp)
-//                        )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(
-                            text = "No local songs yet",
-                            style = TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = LocalPoppinsFont.current,
-                                color = Color.White
-                            )
+                    Text(
+                        text = if (selectedTabIndex == 0) "No songs yet" else "No liked songs yet",
+                        style = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = LocalPoppinsFont.current,
+                            color = Color.White
                         )
+                    )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(
-                            text = "Add your first local song by tapping the + icon",
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontFamily = LocalPoppinsFont.current,
-                                color = Color.Gray
-                            ),
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
+                    Text(
+                        text = if (selectedTabIndex == 0) 
+                            "Add your first song by tapping the + icon" 
+                        else 
+                            "Like songs to see them here",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = LocalPoppinsFont.current,
+                            color = Color.Gray
+                        ),
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
+                    if (selectedTabIndex == 0) {
                         Button(
                             onClick = {
                                 isEditMode = false
@@ -575,46 +461,47 @@ fun YourLibraryScreen() {
                         }
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 18.dp, vertical = 16.dp)
-                ) {
-                    itemsIndexed(
-                        items = songsToShow,
-                        key = { _, song -> song.id } // Use song ID as key for better performance
-                    ) { index, song ->
-                        LocalSongItem(
-                            song = song,
-                            onPlayClick = { playSong(song) },
-                            onEditClick = {
-                                selectedLocalSong = song
-                                // Prefill form fields for editing
-                                songTitle = song.title
-                                artistName = song.artist
-                                songDuration = localSongViewModel.formatDuration(song.duration)
-                                coverImageUri = song.artworkPath?.let { Uri.parse(it) }
-                                audioFileUri = Uri.parse(song.filePath)
-                                isEditMode = true
-                                showBottomSheet = true
-                            },
-                            onDeleteClick = {
-                                selectedLocalSong = song
-                                showDeleteDialog = true
-                            },
-                            onLikeToggle = {
-                                localSongViewModel.toggleLikeStatus(song)
-                            }
-                        )
-
-                        if (index < songsToShow.size - 1) {
-                            Divider(
-                                color = Color.DarkGray,
-                                thickness = 1.dp,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
+            ) {
+                itemsIndexed(
+                    items = songsToShow,
+                    key = { _, song -> song.id } // Use song ID as key for better performance
+                ) { index, song ->
+                    LocalSongItem(
+                        song = song,
+                        onPlayClick = { playSong(song) },
+                        isPlaying = isPlaying && currentPlayingSong?.id == song.id,
+                        onEditClick = {
+                            selectedLocalSong = song
+                            // Prefill form fields for editing
+                            songTitle = song.title
+                            artistName = song.artist
+                            songDuration = localSongViewModel.formatDuration(song.duration)
+                            coverImageUri = song.artworkPath?.let { Uri.parse(it) }
+                            audioFileUri = Uri.parse(song.filePath)
+                            isEditMode = true
+                            showBottomSheet = true
+                        },
+                        onDeleteClick = {
+                            selectedLocalSong = song
+                            showDeleteDialog = true
+                        },
+                        onLikeToggle = {
+                            localSongViewModel.toggleLikeStatus(song)
                         }
+                    )
+
+                    if (index < songsToShow.size - 1) {
+                        Divider(
+                            color = Color.DarkGray,
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
                     }
                 }
             }
@@ -677,7 +564,7 @@ fun YourLibraryScreen() {
                     .padding(24.dp)
             ) {
                 Text(
-                    text = if (isEditMode) "Edit Song" else "Add Local Song",
+                    text = if (isEditMode) "Edit Song" else "Add Song",
                     style = TextStyle(
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
@@ -934,6 +821,7 @@ fun YourLibraryScreen() {
 fun LocalSongItem(
     song: LocalSong,
     onPlayClick: () -> Unit,
+    isPlaying: Boolean,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onLikeToggle: () -> Unit
@@ -971,12 +859,12 @@ fun LocalSongItem(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-//                Icon(
-//                    painter = painterResource(id = R.drawable.ic_music),
-//                    contentDescription = "Music Icon",
-//                    tint = Color.White,
-//                    modifier = Modifier.size(24.dp)
-//                )
+                Icon(
+                    painter = painterResource(id = R.drawable.play_circle),
+                    contentDescription = "Music Icon",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
@@ -985,16 +873,31 @@ fun LocalSongItem(
         Column(
             modifier = Modifier.weight(1f)
         ) {
-            Text(
-                text = song.title,
-                style = TextStyle(
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = LocalPoppinsFont.current,
-                    color = Color.White
-                ),
-                maxLines = 1
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = song.title,
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = LocalPoppinsFont.current,
+                        color = Color.White
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                if (isPlaying) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        painter = painterResource(id = R.drawable.pause),
+                        contentDescription = "Now Playing",
+                        tint = Color(0xFF1DB954),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
 
             Text(
                 text = song.artist,
@@ -1004,6 +907,15 @@ fun LocalSongItem(
                     color = Color.Gray
                 ),
                 maxLines = 1
+            )
+            
+            Text(
+                text = song.duration.toString(),
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    fontFamily = LocalPoppinsFont.current,
+                    color = Color.Gray
+                )
             )
         }
 
@@ -1061,66 +973,6 @@ fun LocalSongItem(
                         onDeleteClick()
                     }
                 )
-            }
-        }
-    }
-}
-
-class SongsAdapter(
-    private val songs: List<Song>,
-    private val onSongClick: (Song) -> Unit
-) : RecyclerView.Adapter<SongsAdapter.SongViewHolder>() {
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SongViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_song, parent, false)
-        return SongViewHolder(view, songs as MutableList<Song>)
-    }
-
-    override fun onBindViewHolder(holder: SongViewHolder, position: Int) {
-        val song = songs[position]
-        holder.bind(song)
-        holder.itemView.setOnClickListener { onSongClick(song) }
-    }
-
-    override fun getItemCount() = songs.size
-
-    class SongViewHolder(
-        itemView: View,
-        private val songs: MutableList<Song>
-    ) : RecyclerView.ViewHolder(itemView) {
-        private val imageAlbumArt: ImageView = itemView.findViewById(R.id.imageAlbumArt)
-        private val textTitle: TextView = itemView.findViewById(R.id.textTitle)
-        private val textArtist: TextView = itemView.findViewById(R.id.textArtist)
-        private val imageLike: ImageView = itemView.findViewById(R.id.imageLike)
-
-        fun bind(song: Song) {
-            textTitle.text = song.title
-            textArtist.text = song.artist
-
-            Glide.with(itemView.context)
-                .load(song.imageUrl)
-                .placeholder(R.drawable.placeholder_album)
-                .into(imageAlbumArt)
-
-            imageLike.setImageResource(
-                if (song.isLiked) R.drawable.ic_heart_filled
-                else R.drawable.ic_heart_outline
-            )
-
-            imageLike.setOnClickListener {
-                song.isLiked = !song.isLiked
-
-                imageLike.setImageResource(
-                    if (song.isLiked) R.drawable.ic_heart_filled
-                    else R.drawable.ic_heart_outline
-                )
-
-                Toast.makeText(
-                    itemView.context,
-                    if (song.isLiked) "Added to Liked Songs" else "Removed from Liked Songs",
-                    Toast.LENGTH_SHORT
-                ).show()
             }
         }
     }
