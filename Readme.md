@@ -29,19 +29,19 @@ Purrytify adalah aplikasi pemutar musik. Aplikasi ini memungkinkan pengguna untu
 ## Screenshot Aplikasi
 
 ### Login Screen
-![Login Screen](app/src/main/res/drawable/loginPage.jpg)
+![Login Screen](image/loginPage.jpg)
 
 ### Home (Daftar Lagu)
-![Home Screen](app/src/main/res/drawable/homePage.jpg)
+![Home Screen](image/homePage.jpg)
 
 ### Library
-![Now Playing](app/src/main/res/drawable/emptyLibrary.jpg)
+![Now Playing](image/emptyLibrary.jpg)
 
 ### User Profile
-![User Profile](app/src/main/res/drawable/profilPage.jpg)
+![User Profile](image/profilPage.jpg)
 
 ### Add Song 
-![Add Song Form](app/src/main/res/drawable/createSong.jpg)
+![Add Song Form](image/createSong.jpg)
 
 ---
 
