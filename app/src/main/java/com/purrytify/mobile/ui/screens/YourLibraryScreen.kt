@@ -76,6 +76,8 @@ import com.purrytify.mobile.LocalPoppinsFont
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -88,6 +90,19 @@ fun YourLibraryScreen() {
     var currentPlayingSong by remember { mutableStateOf<LocalSong?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var playbackError by remember { mutableStateOf<String?>(null) }
+    var currentPosition by remember { mutableStateOf(0) }
+    var totalDuration by remember { mutableStateOf(0) }
+
+    // Update current position every 100ms while playing
+    LaunchedEffect(isPlaying, currentPlayingSong) {
+        if (isPlaying) {
+            totalDuration = mediaPlayer.duration
+            while (isActive && isPlaying) {
+                currentPosition = mediaPlayer.currentPosition
+                delay(100) // Update every 100ms
+            }
+        }
+    }
 
     // Dispose of MediaPlayer when leaving the screen
     DisposableEffect(Unit) {
@@ -102,24 +117,14 @@ fun YourLibraryScreen() {
     // Setup MediaPlayer listeners
     LaunchedEffect(Unit) {
         mediaPlayer.setOnPreparedListener {
+            totalDuration = it.duration
             it.start()
             isPlaying = true
-            playbackError = null
         }
 
         mediaPlayer.setOnCompletionListener {
             isPlaying = false
-        }
-
-        mediaPlayer.setOnErrorListener { _, what, extra ->
-            isPlaying = false
-            playbackError = "Error playing song (code: $what)"
-            Toast.makeText(
-                context,
-                "Error playing song: $what, $extra",
-                Toast.LENGTH_SHORT
-            ).show()
-            true // Error handled
+            currentPosition = 0
         }
     }
 
@@ -139,32 +144,18 @@ fun YourLibraryScreen() {
                 // Play a new song
                 currentPlayingSong = song
                 mediaPlayer.reset()
-                
+                currentPosition = 0
+
                 try {
                     val uri = Uri.parse(song.filePath)
                     mediaPlayer.setDataSource(context, uri)
                     mediaPlayer.prepareAsync()
-                    Toast.makeText(
-                        context,
-                        "Loading \"${song.title}\"...",
-                        Toast.LENGTH_SHORT
-                    ).show()
                 } catch (e: Exception) {
-                    playbackError = "Error: ${e.message}"
-                    Toast.makeText(
-                        context,
-                        "Error loading song: ${e.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    // Handle error
                 }
             }
         } catch (e: Exception) {
-            playbackError = "Error: ${e.message}"
-            Toast.makeText(
-                context,
-                "Playback error: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
+            // Handle error
         }
     }
 
@@ -466,7 +457,12 @@ fun YourLibraryScreen() {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 18.dp, vertical = 16.dp)
+                    .padding(
+                        start = 18.dp, 
+                        end = 18.dp, 
+                        top = 16.dp,
+                        bottom = if (currentPlayingSong != null) 80.dp else 16.dp
+                    )
             ) {
                 itemsIndexed(
                     items = songsToShow,
@@ -505,6 +501,37 @@ fun YourLibraryScreen() {
                     }
                 }
             }
+        }
+    }
+
+    if (currentPlayingSong != null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            MiniPlayer(
+                song = currentPlayingSong!!,
+                isPlaying = isPlaying,
+                currentPosition = currentPosition,
+                totalDuration = totalDuration,
+                onPlayPauseClick = {
+                    if (mediaPlayer.isPlaying) {
+                        mediaPlayer.pause()
+                        isPlaying = false
+                    } else {
+                        mediaPlayer.start()
+                        isPlaying = true
+                    }
+                },
+                onSeek = { position ->
+                    mediaPlayer.seekTo(position)
+                    currentPosition = position
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 0.dp) // Bottom navigation height
+            )
         }
     }
 
@@ -812,6 +839,118 @@ fun YourLibraryScreen() {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun MiniPlayer(
+    song: LocalSong,
+    isPlaying: Boolean,
+    onPlayPauseClick: () -> Unit,
+    onCloseClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(70.dp)
+            .background(
+                color = Color(0xFF282828),
+                shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Album artwork
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(Color.DarkGray, RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (song.artworkPath != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            ImageView(ctx).apply {
+                                scaleType = ImageView.ScaleType.CENTER_CROP
+                            }
+                        },
+                        update = { imageView ->
+                            Glide.with(imageView)
+                                .load(Uri.parse(song.artworkPath))
+                                .centerCrop()
+                                .placeholder(R.drawable.placeholder_album)
+                                .into(imageView)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = R.drawable.play_circle),
+                        contentDescription = "Music Icon",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Song info
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = song.title,
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = LocalPoppinsFont.current,
+                        color = Color.White
+                    ),
+                    maxLines = 1
+                )
+
+                Text(
+                    text = song.artist,
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontFamily = LocalPoppinsFont.current,
+                        color = Color.Gray
+                    ),
+                    maxLines = 1
+                )
+            }
+
+            // Playback controls
+            IconButton(
+                onClick = onPlayPauseClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    painter = painterResource(
+                        id = if (isPlaying) R.drawable.pause else R.drawable.play_circle
+                    ),
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = Color(0xFF1DB954),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onCloseClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.pause),
+                    contentDescription = "Close",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
