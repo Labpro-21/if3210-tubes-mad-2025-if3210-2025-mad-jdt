@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
+    // Removed kotlin.compose plugin and replaced with direct compiler configuration
+    id("com.google.devtools.ksp") version "1.9.22-1.0.16" // Downgraded KSP version for better compatibility
 }
 
 android {
@@ -37,6 +38,9 @@ android {
     buildFeatures {
         compose = true
     }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8" // Compatible with Kotlin 1.9.22
+    }
 }
 
 dependencies {
@@ -59,6 +63,13 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
 //    implementation(libs.navigation.compose)
     implementation(libs.androidx.navigation.compose.v276)
+
+    // Room Database dependencies
+    val roomVersion = "2.6.0"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

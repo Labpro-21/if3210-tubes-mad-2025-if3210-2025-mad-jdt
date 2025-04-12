@@ -1,46 +1,177 @@
 package com.purrytify.mobile.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.media.MediaMetadataRetriever
+import android.media.MediaPlayer
+import android.net.Uri
+import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.purrytify.mobile.LocalPoppinsFont
 import com.purrytify.mobile.R
+import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.models.Song
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment
-import android.content.Intent
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.provider.MediaStore
-import android.widget.Toast
-import coil.compose.rememberAsyncImagePainter
-import coil.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
-
+import com.purrytify.mobile.viewmodel.LocalSongViewModel
+import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun YourLibraryScreen() {
+    // Create a MediaPlayer instance and track state
+    val context = LocalContext.current
+    val mediaPlayer = remember { MediaPlayer() }
+    var currentPlayingSong by remember { mutableStateOf<LocalSong?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var playbackError by remember { mutableStateOf<String?>(null) }
+
+    // Dispose of MediaPlayer when leaving the screen
+    DisposableEffect(Unit) {
+        onDispose {
+            if (mediaPlayer.isPlaying) {
+                mediaPlayer.stop()
+            }
+            mediaPlayer.release()
+        }
+    }
+
+    // Setup MediaPlayer listeners
+    LaunchedEffect(Unit) {
+        mediaPlayer.setOnPreparedListener {
+            it.start()
+            isPlaying = true
+            playbackError = null
+        }
+
+        mediaPlayer.setOnCompletionListener {
+            isPlaying = false
+        }
+
+        mediaPlayer.setOnErrorListener { _, what, extra ->
+            isPlaying = false
+            playbackError = "Error playing song (code: $what)"
+            Toast.makeText(
+                context,
+                "Error playing song: $what, $extra",
+                Toast.LENGTH_SHORT
+            ).show()
+            true // Error handled
+        }
+    }
+
+    // Function to handle play/pause logic
+    val playSong = { song: LocalSong ->
+        try {
+            if (currentPlayingSong?.id == song.id) {
+                // Toggle play/pause for current song
+                if (mediaPlayer.isPlaying) {
+                    mediaPlayer.pause()
+                    isPlaying = false
+                } else {
+                    mediaPlayer.start()
+                    isPlaying = true
+                }
+            } else {
+                // Play a new song
+                currentPlayingSong = song
+                mediaPlayer.reset()
+                
+                try {
+                    val uri = Uri.parse(song.filePath)
+                    mediaPlayer.setDataSource(context, uri)
+                    mediaPlayer.prepareAsync()
+                    Toast.makeText(
+                        context,
+                        "Loading \"${song.title}\"...",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: Exception) {
+                    playbackError = "Error: ${e.message}"
+                    Toast.makeText(
+                        context,
+                        "Error loading song: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        } catch (e: Exception) {
+            playbackError = "Error: ${e.message}"
+            Toast.makeText(
+                context,
+                "Playback error: ${e.message}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     val allSongs = remember {
         mutableStateListOf(
             Song(
@@ -86,38 +217,124 @@ fun YourLibraryScreen() {
         )
     }
 
-    // Remember states for temporary uploads
+    val localSongViewModel: LocalSongViewModel = viewModel()
+    val localSongs by localSongViewModel.allSongs.collectAsState()
+    val likedLocalSongs by localSongViewModel.likedSongs.collectAsState()
+    val isLoading by localSongViewModel.isLoading.collectAsState()
+    val errorMessage by localSongViewModel.errorMessage.collectAsState()
+
+    val permissionsToRequest = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.READ_MEDIA_IMAGES
+            )
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    var permissionsGranted by remember {
+        mutableStateOf(
+            permissionsToRequest.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        permissionsGranted = permissions.values.all { it }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!permissionsGranted) {
+            permissionLauncher.launch(permissionsToRequest)
+        }
+    }
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var selectedLocalSong by remember { mutableStateOf<LocalSong?>(null) }
+
     var coverImageUri by remember { mutableStateOf<Uri?>(null) }
     var audioFileUri by remember { mutableStateOf<Uri?>(null) }
+    var songTitle by remember { mutableStateOf("") }
+    var artistName by remember { mutableStateOf("") }
+    var songDuration by remember { mutableStateOf("--:--") }
+    var isEditMode by remember { mutableStateOf(false) }
 
-    // Photo picker launcher
+    val scope = rememberCoroutineScope()
+
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { coverImageUri = it }
     }
 
-    // Audio file picker launcher
     val pickAudioLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { audioFileUri = it }
+        uri?.let {
+            audioFileUri = it
+            if (!isEditMode) {
+                scope.launch {
+                    try {
+                        val retriever = MediaMetadataRetriever()
+                        retriever.setDataSource(context, uri)
+
+                        val extractedTitle =
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                        if (!extractedTitle.isNullOrBlank()) {
+                            songTitle = extractedTitle
+                        } else {
+                            val fileName = uri.lastPathSegment?.substringAfterLast('/')
+                            if (!fileName.isNullOrBlank()) {
+                                songTitle = File(fileName).nameWithoutExtension
+                            }
+                        }
+
+                        val extractedArtist =
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                        if (!extractedArtist.isNullOrBlank()) {
+                            artistName = extractedArtist
+                        } else {
+                            artistName = "Unknown Artist"
+                        }
+
+                        val durationString =
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        val duration = durationString?.toLongOrNull() ?: 0
+                        songDuration = localSongViewModel.formatDuration(duration)
+
+                        retriever.release()
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            "Error reading metadata: ${e.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        }
     }
 
     val likedSongs = remember { allSongs.filter { it.isLiked } }
     var selectedTabIndex by remember { mutableStateOf(0) }
+    var showSongSourceTabs by remember { mutableStateOf(false) }
+    var songSourceTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("All", "Liked")
     val tabIndex = selectedTabIndex
-    val tabPositions = remember { mutableStateListOf<TabPosition>() }
-    val context = LocalContext.current
     var showBottomSheet by remember { mutableStateOf(false) }
+    var showOptionsMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Header Section
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -135,7 +352,19 @@ fun YourLibraryScreen() {
                 )
             )
 
-            IconButton(onClick = { showBottomSheet = true }) {
+            IconButton(onClick = {
+                if (!permissionsGranted) {
+                    permissionLauncher.launch(permissionsToRequest)
+                    return@IconButton
+                }
+                isEditMode = false
+                songTitle = ""
+                artistName = ""
+                songDuration = "--:--"
+                coverImageUri = null
+                audioFileUri = null
+                showBottomSheet = true
+            }) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_add),
                     contentDescription = "Add Song",
@@ -145,7 +374,45 @@ fun YourLibraryScreen() {
             }
         }
 
-        // Tab Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { songSourceTabIndex = 0 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (songSourceTabIndex == 0) Color(0xFF1DB954) else Color.DarkGray,
+                    contentColor = if (songSourceTabIndex == 0) Color.Black else Color.White
+                ),
+                shape = RoundedCornerShape(45.dp),
+                modifier = Modifier.size(90.dp, 32.dp)
+            ) {
+                Text(
+                    text = "Remote",
+                    fontSize = 12.sp
+                )
+            }
+
+            Button(
+                onClick = { songSourceTabIndex = 1 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (songSourceTabIndex == 1) Color(0xFF1DB954) else Color.DarkGray,
+                    contentColor = if (songSourceTabIndex == 1) Color.Black else Color.White
+                ),
+                shape = RoundedCornerShape(45.dp),
+                modifier = Modifier.size(70.dp, 32.dp)
+            ) {
+                Text(
+                    text = "Local",
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -163,8 +430,7 @@ fun YourLibraryScreen() {
             ) {
                 Text(
                     text = "All",
-                    fontSize = 12.sp,
-                    modifier = Modifier.align(alignment = Alignment.CenterVertically)
+                    fontSize = 12.sp
                 )
             }
 
@@ -184,7 +450,6 @@ fun YourLibraryScreen() {
             }
         }
 
-        // line
         Spacer(modifier = Modifier.height(16.dp))
         Box(
             modifier = Modifier
@@ -193,31 +458,212 @@ fun YourLibraryScreen() {
                 .background(color = Color.DarkGray)
         )
 
-        // Content using RecyclerView
-        AndroidView(
-            factory = { context ->
-                RecyclerView(context).apply {
-                    layoutManager = LinearLayoutManager(context)
-                    clipToPadding = false
+        if (isLoading && songSourceTabIndex == 1) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFF1DB954))
+            }
+        }
+
+        errorMessage?.let { error ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = error,
+                    color = Color.Red,
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontFamily = LocalPoppinsFont.current
+                    )
+                )
+            }
+        }
+
+        if (songSourceTabIndex == 0) {
+            AndroidView(
+                factory = { ctx ->
+                    RecyclerView(ctx).apply {
+                        layoutManager = LinearLayoutManager(ctx)
+                        clipToPadding = false
+                    }
+                },
+                update = { recyclerView ->
+                    val songsToShow = if (selectedTabIndex == 0) allSongs else likedSongs
+                    recyclerView.adapter = SongsAdapter(songsToShow) { song ->
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
+            )
+        } else if (songSourceTabIndex == 1) {
+            val songsToShow = if (selectedTabIndex == 0) localSongs else likedLocalSongs
+
+            if (songsToShow.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+//                        Icon(
+//                            painter = painterResource(id = R.drawable.ic_music),
+//                            contentDescription = "No Songs",
+//                            tint = Color.Gray,
+//                            modifier = Modifier.size(64.dp)
+//                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "No local songs yet",
+                            style = TextStyle(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = LocalPoppinsFont.current,
+                                color = Color.White
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Add your first local song by tapping the + icon",
+                            style = TextStyle(
+                                fontSize = 14.sp,
+                                fontFamily = LocalPoppinsFont.current,
+                                color = Color.Gray
+                            ),
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                isEditMode = false
+                                songTitle = ""
+                                artistName = ""
+                                songDuration = "--:--"
+                                coverImageUri = null
+                                audioFileUri = null
+                                showBottomSheet = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF1DB954),
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(45.dp)
+                        ) {
+                            Text(
+                                text = "Add Song",
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 18.dp, vertical = 16.dp)
+                ) {
+                    itemsIndexed(
+                        items = songsToShow,
+                        key = { _, song -> song.id } // Use song ID as key for better performance
+                    ) { index, song ->
+                        LocalSongItem(
+                            song = song,
+                            onPlayClick = { playSong(song) },
+                            onEditClick = {
+                                selectedLocalSong = song
+                                // Prefill form fields for editing
+                                songTitle = song.title
+                                artistName = song.artist
+                                songDuration = localSongViewModel.formatDuration(song.duration)
+                                coverImageUri = song.artworkPath?.let { Uri.parse(it) }
+                                audioFileUri = Uri.parse(song.filePath)
+                                isEditMode = true
+                                showBottomSheet = true
+                            },
+                            onDeleteClick = {
+                                selectedLocalSong = song
+                                showDeleteDialog = true
+                            },
+                            onLikeToggle = {
+                                localSongViewModel.toggleLikeStatus(song)
+                            }
+                        )
+
+                        if (index < songsToShow.size - 1) {
+                            Divider(
+                                color = Color.DarkGray,
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Song") },
+            text = { Text("Are you sure you want to delete \"${selectedLocalSong?.title}\"?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        selectedLocalSong?.let {
+                            localSongViewModel.deleteSong(it)
+                            Toast.makeText(context, "Song deleted", Toast.LENGTH_SHORT).show()
+                        }
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Delete")
                 }
             },
-            update = { recyclerView ->
-                val songsToShow = if (selectedTabIndex == 0) allSongs else likedSongs
-                recyclerView.adapter = SongsAdapter(songsToShow) { song ->
-                    // Handle song click
+            dismissButton = {
+                Button(
+                    onClick = { showDeleteDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                ) {
+                    Text("Cancel")
                 }
             },
-            modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 16.dp)
+            containerColor = Color(0xFF282828),
+            textContentColor = Color.White,
+            titleContentColor = Color.White
         )
     }
 
-    // Bottom Sheet for Add Song
     if (showBottomSheet) {
         ModalBottomSheet(
             onDismissRequest = {
-                // Clear temporary states when closing
-                coverImageUri = null
-                audioFileUri = null
+                if (!isEditMode) {
+                    coverImageUri = null
+                    audioFileUri = null
+                    songTitle = ""
+                    artistName = ""
+                    songDuration = "--:--"
+                }
                 showBottomSheet = false
             },
             containerColor = Color(0xFF121212),
@@ -225,16 +671,13 @@ fun YourLibraryScreen() {
             dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) },
             modifier = Modifier.fillMaxHeight(0.7f)
         ) {
-            var songTitle by remember { mutableStateOf("") }
-            var artistName by remember { mutableStateOf("") }
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp)
             ) {
                 Text(
-                    text = "Upload Song",
+                    text = if (isEditMode) "Edit Song" else "Add Local Song",
                     style = TextStyle(
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
@@ -246,7 +689,6 @@ fun YourLibraryScreen() {
                         .align(Alignment.CenterHorizontally)
                 )
 
-                // Album Cover Upload Section with preview if selected
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -331,7 +773,7 @@ fun YourLibraryScreen() {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "File Selected",
+                                        text = "Duration: $songDuration",
                                         color = Color.White,
                                         fontSize = 12.sp,
                                         modifier = Modifier.padding(vertical = 4.dp)
@@ -355,7 +797,6 @@ fun YourLibraryScreen() {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Rest of form fields...
                 OutlinedTextField(
                     value = songTitle,
                     onValueChange = { songTitle = it },
@@ -375,7 +816,6 @@ fun YourLibraryScreen() {
                     )
                 )
 
-                // Artist Name Input
                 OutlinedTextField(
                     value = artistName,
                     onValueChange = { artistName = it },
@@ -397,7 +837,6 @@ fun YourLibraryScreen() {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Upload Button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -406,8 +845,10 @@ fun YourLibraryScreen() {
                 ) {
                     Button(
                         onClick = {
-                            coverImageUri = null
-                            audioFileUri = null
+                            if (!isEditMode) {
+                                coverImageUri = null
+                                audioFileUri = null
+                            }
                             showBottomSheet = false
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -419,36 +860,56 @@ fun YourLibraryScreen() {
                     ) {
                         Text(
                             text = "Cancel",
-                            fontSize = 14.sp,
-                            modifier = Modifier.align(alignment = Alignment.CenterVertically)
+                            fontSize = 14.sp
                         )
                     }
 
                     Button(
                         onClick = {
-                            // Validate and add new song if input is valid
-                            if (songTitle.isNotBlank() && artistName.isNotBlank() && coverImageUri != null && audioFileUri != null) {
-                                // Create a new song with the provided details
-                                val newSong = Song(
-                                    id = (allSongs.size + 1).toString(),
+                            if (isEditMode) {
+                                selectedLocalSong?.let { song ->
+                                    if (songTitle.isBlank() || artistName.isBlank() || audioFileUri == null) {
+                                        Toast.makeText(
+                                            context,
+                                            "Please fill all required fields",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        return@Button
+                                    }
+
+                                    val updatedSong = song.copy(
+                                        title = songTitle,
+                                        artist = artistName,
+                                        artworkPath = coverImageUri?.toString()
+                                    )
+
+                                    localSongViewModel.updateSong(updatedSong)
+                                    Toast.makeText(
+                                        context,
+                                        "Song updated successfully",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    showBottomSheet = false
+                                }
+                            } else {
+                                if (songTitle.isBlank() || artistName.isBlank() || audioFileUri == null) {
+                                    Toast.makeText(
+                                        context,
+                                        "Please fill all required fields",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
+                                }
+
+                                localSongViewModel.addSong(
+                                    audioFileUri = audioFileUri!!,
+                                    coverImageUri = coverImageUri,
                                     title = songTitle,
-                                    artist = artistName,
-                                    imageUrl = coverImageUri.toString(),
-                                    audioUrl = audioFileUri.toString(),
-                                    isLiked = false
+                                    artist = artistName
                                 )
 
-                                // Add to our songs list
-                                allSongs.add(newSong)
-
-                                // Show success message
-                                Toast.makeText(context, "Song uploaded successfully", Toast.LENGTH_SHORT).show()
-
-                                // Close bottom sheet and reset values
+                                Toast.makeText(context, "Adding song...", Toast.LENGTH_SHORT).show()
                                 showBottomSheet = false
-                            } else {
-                                // Show error message for missing fields
-                                Toast.makeText(context, "Please fill all fields and select files", Toast.LENGTH_SHORT).show()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -459,7 +920,7 @@ fun YourLibraryScreen() {
                         modifier = Modifier.size(152.dp, 40.dp)
                     ) {
                         Text(
-                            text = "Upload",
+                            text = if (isEditMode) "Save Changes" else "Add Song",
                             fontSize = 14.sp
                         )
                     }
@@ -470,52 +931,141 @@ fun YourLibraryScreen() {
 }
 
 @Composable
-fun AddSongOption(
-    icon: Int,
-    title: String,
-    description: String,
-    onClick: () -> Unit
+fun LocalSongItem(
+    song: LocalSong,
+    onPlayClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onLikeToggle: () -> Unit
 ) {
+    var showOptions by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick }
-            .padding(vertical = 12.dp),
+            .clickable { onPlayClick() }
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            painter = painterResource(id = icon),
-            contentDescription = title,
-            tint = Color.White,
-            modifier = Modifier.size(24.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .background(Color.DarkGray, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (song.artworkPath != null) {
+                AndroidView(
+                    factory = { ctx ->
+                        ImageView(ctx).apply {
+                            scaleType = ImageView.ScaleType.CENTER_CROP
+                        }
+                    },
+                    update = { imageView ->
+                        Glide.with(imageView)
+                            .load(Uri.parse(song.artworkPath))
+                            .centerCrop()
+                            .placeholder(R.drawable.placeholder_album)
+                            .into(imageView)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+//                Icon(
+//                    painter = painterResource(id = R.drawable.ic_music),
+//                    contentDescription = "Music Icon",
+//                    tint = Color.White,
+//                    modifier = Modifier.size(24.dp)
+//                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        Column {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
             Text(
-                text = title,
+                text = song.title,
                 style = TextStyle(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = LocalPoppinsFont.current,
                     color = Color.White
-                )
+                ),
+                maxLines = 1
             )
 
             Text(
-                text = description,
+                text = song.artist,
                 style = TextStyle(
                     fontSize = 14.sp,
-                    color = Color.Gray,
-                    fontFamily = LocalPoppinsFont.current
-                )
+                    fontFamily = LocalPoppinsFont.current,
+                    color = Color.Gray
+                ),
+                maxLines = 1
             )
+        }
+
+        IconButton(onClick = { onLikeToggle() }) {
+            Icon(
+                painter = painterResource(
+                    id = if (song.isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+                ),
+                contentDescription = "Like",
+                tint = if (song.isLiked) Color(0xFF1DB954) else Color.Gray,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Box {
+            IconButton(onClick = { showOptions = true }) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "More Options",
+                    tint = Color.Gray
+                )
+            }
+
+            DropdownMenu(
+                expanded = showOptions,
+                onDismissRequest = { showOptions = false },
+                modifier = Modifier.background(Color(0xFF282828))
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Edit", color = Color.White) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = Color.White
+                        )
+                    },
+                    onClick = {
+                        showOptions = false
+                        onEditClick()
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = { Text("Delete", color = Color.Red) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = Color.Red
+                        )
+                    },
+                    onClick = {
+                        showOptions = false
+                        onDeleteClick()
+                    }
+                )
+            }
         }
     }
 }
 
-// RecyclerView Adapter for songs
 class SongsAdapter(
     private val songs: List<Song>,
     private val onSongClick: (Song) -> Unit
@@ -548,30 +1098,24 @@ class SongsAdapter(
             textTitle.text = song.title
             textArtist.text = song.artist
 
-            // Load image with Glide
             Glide.with(itemView.context)
                 .load(song.imageUrl)
                 .placeholder(R.drawable.placeholder_album)
                 .into(imageAlbumArt)
 
-            // Set heart icon based on liked status
             imageLike.setImageResource(
                 if (song.isLiked) R.drawable.ic_heart_filled
                 else R.drawable.ic_heart_outline
             )
 
-            // Add click listener for the like button
             imageLike.setOnClickListener {
-                // Toggle like status
                 song.isLiked = !song.isLiked
 
-                // Update icon
                 imageLike.setImageResource(
                     if (song.isLiked) R.drawable.ic_heart_filled
                     else R.drawable.ic_heart_outline
                 )
 
-                // Optional: Show toast for like/unlike
                 Toast.makeText(
                     itemView.context,
                     if (song.isLiked) "Added to Liked Songs" else "Removed from Liked Songs",
