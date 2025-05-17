@@ -38,7 +38,11 @@ import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import kotlinx.coroutines.launch
-
+import com.purrytify.mobile.ui.MiniPlayer
+import com.purrytify.mobile.ui.initializeMediaPlayer
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
     error("Poppins font family not provided")
@@ -150,40 +154,51 @@ class MainActivity : ComponentActivity() {
 // --- Main Authenticated Content Composable ---
 @Composable
 fun MainContent(
-    navController: NavHostController, // Top-level controller for logout
-    tokenManager: TokenManager, // Pass needed dependencies
-    authRepository: AuthRepository // Pass the repository instance
+    navController: NavHostController, 
+    tokenManager: TokenManager, 
+    authRepository: AuthRepository 
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
     val scope = rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+    val context = LocalContext.current
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black,
-        bottomBar = {
-            BottomNavigationBar(navController = nestedNavController)
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = nestedNavController, // Use nested controller here
-            startDestination = BottomNavItem.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
-            composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
-            composable(BottomNavItem.Profile.route) {
-                ProfileScreen(
-                    authRepository = authRepository, // Pass the repository instance
-                    onLogout = {
-                        scope.launch { // Use the scope obtained from rememberCoroutineScope()
-                            authRepository.logout()
-                            navController.navigate("auth") { // Navigate back to auth flow
-                                popUpTo("main") { inclusive = true } // Clear main backstack
-                                launchSingleTop = true
+    // Initialize MediaPlayer
+    LaunchedEffect(Unit) {
+        initializeMediaPlayer(context)
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Black,
+            bottomBar = {
+                Column {
+                    MiniPlayer() // 56dp is the height of the BottomNavigationBar
+                    BottomNavigationBar(navController = nestedNavController)
+                }
+            }
+        ) { innerPadding ->
+            NavHost(
+                navController = nestedNavController,
+                startDestination = BottomNavItem.Home.route,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Profile.route) {
+                    ProfileScreen(
+                        authRepository = authRepository, // Pass the repository instance
+                        onLogout = {
+                            scope.launch { // Use the scope obtained from rememberCoroutineScope()
+                                authRepository.logout()
+                                navController.navigate("auth") { // Navigate back to auth flow
+                                    popUpTo("main") { inclusive = true } // Clear main backstack
+                                    launchSingleTop = true
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
