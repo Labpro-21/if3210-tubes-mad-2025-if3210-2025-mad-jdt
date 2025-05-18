@@ -45,7 +45,11 @@ import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
+import com.purrytify.mobile.ui.MiniPlayer
+import com.purrytify.mobile.ui.initializeMediaPlayer
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
     error("Poppins font family not provided")
@@ -63,7 +67,7 @@ class MainActivity : ComponentActivity() {
         val retrofit = ApiClient.buildRetrofit()
         val authService = ApiClient.createAuthService(retrofit)
         val authRepository = AuthRepository(tokenManager, authService)
-        val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext) // Add this line
+        val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext)
         // --- End Dependencies ---
 
         setContent {
@@ -166,9 +170,15 @@ fun MainContent(
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
     val scope = rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus = networkConnectivityObserver.observe().collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
 
+    // Initialize MediaPlayer
+    LaunchedEffect(Unit) {
+        initializeMediaPlayer(context)
+    }
+    
     // Show network status changes
     LaunchedEffect(networkStatus) {
         when (networkStatus) {
@@ -186,19 +196,23 @@ fun MainContent(
             else -> {} // Do nothing for LOSING state
         }
     }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        bottomBar = {
-            BottomNavigationBar(navController = nestedNavController)
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+    
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Black,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            bottomBar = {
+                Column {
+                    MiniPlayer() // 56dp is the height of the BottomNavigationBar
+                    BottomNavigationBar(navController = nestedNavController)
+                }
+            }
+        ) { innerPadding ->
             NavHost(
-                navController = nestedNavController, // Use nested controller here
-                startDestination = BottomNavItem.Home.route
+                navController = nestedNavController,
+                startDestination = BottomNavItem.Home.route,
+                modifier = Modifier.padding(innerPadding)
             ) {
                 composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
                 composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
