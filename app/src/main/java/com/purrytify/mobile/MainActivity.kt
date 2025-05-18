@@ -5,11 +5,16 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -37,6 +42,8 @@ import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
+import com.purrytify.mobile.utils.NetworkConnectivityObserver
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.purrytify.mobile.ui.MiniPlayer
 import com.purrytify.mobile.ui.initializeMediaPlayer
@@ -60,6 +67,7 @@ class MainActivity : ComponentActivity() {
         val retrofit = ApiClient.buildRetrofit()
         val authService = ApiClient.createAuthService(retrofit)
         val authRepository = AuthRepository(tokenManager, authService)
+        val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext)
         // --- End Dependencies ---
 
         setContent {
@@ -110,7 +118,8 @@ class MainActivity : ComponentActivity() {
                             MainContent(
                                 navController = navController,
                                 tokenManager = tokenManager,
-                                authRepository = authRepository
+                                authRepository = authRepository,
+                                networkConnectivityObserver = networkConnectivityObserver // Add this parameter
                             )
                         }
                     }
@@ -154,23 +163,45 @@ class MainActivity : ComponentActivity() {
 // --- Main Authenticated Content Composable ---
 @Composable
 fun MainContent(
-    navController: NavHostController, 
-    tokenManager: TokenManager, 
-    authRepository: AuthRepository 
+    navController: NavHostController, // Top-level controller for logout
+    tokenManager: TokenManager, // Pass needed dependencies
+    authRepository: AuthRepository, // Pass the repository instance
+    networkConnectivityObserver: NetworkConnectivityObserver
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
     val scope = rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val networkStatus = networkConnectivityObserver.observe().collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
 
     // Initialize MediaPlayer
     LaunchedEffect(Unit) {
         initializeMediaPlayer(context)
     }
-
+    
+    // Show network status changes
+    LaunchedEffect(networkStatus) {
+        when (networkStatus) {
+            NetworkConnectivityObserver.Status.UNAVAILABLE,
+            NetworkConnectivityObserver.Status.LOST -> {
+                snackbarHostState.showSnackbar("No network connection")
+            }
+            NetworkConnectivityObserver.Status.AVAILABLE -> {
+                if (snackbarHostState.currentSnackbarData != null) {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    delay(300) // Give time for previous snackbar to dismiss
+                    snackbarHostState.showSnackbar("Network connection restored")
+                }
+            }
+            else -> {} // Do nothing for LOSING state
+        }
+    }
+    
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Black,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
                 Column {
                     MiniPlayer() // 56dp is the height of the BottomNavigationBar
@@ -188,6 +219,7 @@ fun MainContent(
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
                         authRepository = authRepository, // Pass the repository instance
+                        networkConnectivityObserver = networkConnectivityObserver, // Add this parameter
                         onLogout = {
                             scope.launch { // Use the scope obtained from rememberCoroutineScope()
                                 authRepository.logout()

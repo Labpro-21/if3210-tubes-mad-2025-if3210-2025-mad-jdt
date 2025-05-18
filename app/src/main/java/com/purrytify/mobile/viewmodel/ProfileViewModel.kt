@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.purrytify.mobile.api.ProfileResponse
 import com.purrytify.mobile.data.AuthRepository
+import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -17,18 +18,46 @@ sealed class ProfileUiState {
     object Loading : ProfileUiState()
     data class Success(val profile: ProfileResponse) : ProfileUiState()
     data class Error(val message: String) : ProfileUiState()
+    object NetworkError : ProfileUiState() // Add this state
 }
 
 // --- ViewModel ---
 class ProfileViewModel(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val networkObserver: NetworkConnectivityObserver // Add this parameter
 ) : ViewModel() {
 
     private val _profileUiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Initial)
     val profileUiState: StateFlow<ProfileUiState> = _profileUiState
+    
+    private val _networkStatus = MutableStateFlow(NetworkConnectivityObserver.Status.AVAILABLE)
+    val networkStatus: StateFlow<NetworkConnectivityObserver.Status> = _networkStatus
+    
+    init {
+        observeNetworkStatus()
+    }
+    
+    private fun observeNetworkStatus() {
+        viewModelScope.launch {
+            networkObserver.observe().collect { status ->
+                _networkStatus.value = status
+                
+                // If network becomes available and we're in network error state, try fetching again
+                if (status == NetworkConnectivityObserver.Status.AVAILABLE && 
+                    _profileUiState.value is ProfileUiState.NetworkError) {
+                    fetchProfile()
+                }
+            }
+        }
+    }
 
     fun fetchProfile() {
         if (_profileUiState.value is ProfileUiState.Loading) return // Prevent multiple loads
+        
+        if (!networkObserver.isNetworkAvailable()) {
+            _profileUiState.value = ProfileUiState.NetworkError
+            return
+        }
 
         viewModelScope.launch {
             _profileUiState.value = ProfileUiState.Loading
@@ -39,20 +68,26 @@ class ProfileViewModel(
                 _profileUiState.value = ProfileUiState.Success(profile)
             }.onFailure { exception ->
                 Log.e("ProfileViewModel", "Profile fetch failed", exception)
-                _profileUiState.value = ProfileUiState.Error(exception.message ?: "Unknown error")
+                if (!networkObserver.isNetworkAvailable()) {
+                    _profileUiState.value = ProfileUiState.NetworkError
+                } else {
+                    _profileUiState.value = ProfileUiState.Error(exception.message ?: "Unknown error")
+                }
             }
         }
     }
 }
 
 // --- ViewModel Factory ---
-class ProfileViewModelFactory(private val authRepository: AuthRepository) :
-    ViewModelProvider.Factory {
+class ProfileViewModelFactory(
+    private val authRepository: AuthRepository,
+    private val networkObserver: NetworkConnectivityObserver
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ProfileViewModel(authRepository) as T
+            return ProfileViewModel(authRepository, networkObserver) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
