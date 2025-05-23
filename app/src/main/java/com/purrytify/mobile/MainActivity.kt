@@ -173,7 +173,7 @@ fun MainContent(
             containerColor = Color.Black,
             bottomBar = {
                 Column {
-                    MiniPlayer() // 56dp is the height of the BottomNavigationBar
+                    MiniPlayer()
                     BottomNavigationBar(navController = nestedNavController)
                 }
             }
