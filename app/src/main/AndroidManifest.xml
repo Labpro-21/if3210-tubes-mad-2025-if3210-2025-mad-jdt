@@ -36,6 +36,9 @@
             </intent-filter>
         </activity>
         <service
+            android:name=".background.TokenExpirationService"
+            android:exported="false" />
+        <service
             android:name=".service.MusicNotificationService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />

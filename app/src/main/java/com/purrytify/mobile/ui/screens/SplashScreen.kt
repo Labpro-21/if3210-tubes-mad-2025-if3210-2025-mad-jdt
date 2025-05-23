@@ -22,8 +22,16 @@ import androidx.compose.ui.unit.dp
 import com.purrytify.mobile.R
 import kotlinx.coroutines.delay
 
+import androidx.navigation.NavHostController
+import com.purrytify.mobile.data.TokenManager
+import com.purrytify.mobile.data.AuthRepository
+
 @Composable
-fun SplashScreen(onSplashScreenFinish: () -> Unit) {
+fun SplashScreen(
+    tokenManager: TokenManager,
+    authRepository: AuthRepository,
+    navController: NavHostController
+) {
     var startAnimation by remember { mutableStateOf(false) }
     val alphaAnim = animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
@@ -34,7 +42,17 @@ fun SplashScreen(onSplashScreenFinish: () -> Unit) {
     LaunchedEffect(key1 = true) {
         startAnimation = true
         delay(2000)
-        onSplashScreenFinish()
+        val token = tokenManager.getAccessToken()
+        if (token != null && authRepository.verifyToken(token)) {
+            navController.navigate("main") {
+                popUpTo("auth") { inclusive = true }
+            }
+        } else {
+            tokenManager.clearTokens()
+            navController.navigate("login") {
+                popUpTo("auth") { inclusive = true }
+            }
+        }
     }
 
     Splash(alpha = alphaAnim.value)

@@ -2,16 +2,22 @@ package com.purrytify.mobile.background
 
 import android.app.Service
 import android.content.Intent
-import android.os.IBinder
-import kotlinx.coroutines.*
-import java.util.concurrent.TimeUnit
-import com.purrytify.mobile.data.AuthRepository
-import com.purrytify.mobile.data.TokenManager // Import TokenManager
-import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+import android.os.IBinder
 import android.util.Log
 import com.purrytify.mobile.MainActivity
 import com.purrytify.mobile.api.ApiClient
+import com.purrytify.mobile.data.AuthRepository
+import com.purrytify.mobile.data.TokenManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.TimeUnit
 
 class TokenExpirationService : Service() {
 
@@ -41,19 +47,20 @@ class TokenExpirationService : Service() {
     private fun startTokenCheck() {
         serviceScope.launch {
             while (isActive) {
-                Log.d("TokenService", "Checking token...") // Add log here
-                delay(TimeUnit.MINUTES.toMillis(3)) // Check every 3 minutes
+                Log.d("TokenService", "1 Minute started")
+                delay(TimeUnit.MINUTES.toMillis(1)) // 1 Minute
 
                 val accessToken = tokenManager.getAccessToken()
                 if (accessToken != null) {
                     if (!authRepository.verifyToken(accessToken)) {
-                        Log.d("TokenService", "Token expired, refreshing...") // Add log here
+                        Log.d("TokenService", "Token expired, refreshing...")
                         refreshTokenOrLogout()
                     } else {
                         Log.d("TokenService", "Token is valid")
                     }
                 } else {
-                    Log.d("TokenService", "No access token found, stopping service")
+                    Log.d("TokenService", "No access token found, logout")
+                    logout()
                     stopSelf()
                     break
                 }
@@ -63,37 +70,49 @@ class TokenExpirationService : Service() {
 
     private suspend fun refreshTokenOrLogout() {
         val refreshToken = tokenManager.getRefreshToken()
+        Log.d("TokenService", "Refresh token: $refreshToken")
         if (refreshToken != null) {
             val refreshResult = authRepository.refreshToken(refreshToken)
             if (refreshResult != null) {
-                tokenManager.saveTokens(refreshResult.access, refreshResult.refresh)
-                Log.d("TokenService", "Token refreshed successfully") // Add log here
-                // Optionally:  Post a notification to inform the user that the token was refreshed
+                Log.d("TokenService", "Refresh result: ${refreshResult.toString()}")
+                tokenManager.clearTokens()
+                Log.d("TokenService", "Old token cleared")
+                tokenManager.saveTokens(refreshResult.accessToken, refreshResult.refreshToken)
+                Log.d("TokenService", "Token refreshed successfully")
             } else {
-                Log.d("TokenService", "Token refresh failed, logging out") // Add log here
-                logout() // Refresh token failed, logout
+                Log.d("TokenService", "Token refresh failed, logging out")
+                logout()
             }
         } else {
-            Log.d("TokenService", "No refresh token, logout") // Add log here
-            logout() // No refresh token, logout
+            Log.d("TokenService", "No refresh token, logout")
+            logout()
         }
     }
 
 
     private fun logout() {
         Log.d("TokenService", "Logging out...")
-        // Implement your logout logic here:
-        // 1. Clear tokens from DataStore
-        // 2. Navigate user to login screen
-        serviceScope.launch(Dispatchers.Main) {  // Switch to main thread for UI updates
-            tokenManager.clearTokens()
-            // Example navigation (replace with your actual navigation code)
-            val intent = Intent(this@TokenExpirationService, MainActivity::class.java)
-            intent.flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK
-            intent.putExtra("isLogout", true)
-            startActivity(intent)
-            stopSelf() // Stop the service after logout
+        // Use runBlocking to ensure the logout completes before the service stops
+        runBlocking(Dispatchers.Main) {
+            try {
+                // Clear tokens synchronously
+                tokenManager.clearTokensSync()
+                Log.d("TokenService", "Tokens cleared successfully")
+
+                // Create and start the logout intent
+                val intent = Intent(this@TokenExpirationService, MainActivity::class.java).apply {
+                    flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK
+                    putExtra("isLogout", true)
+                }
+                startActivity(intent)
+                Log.d("TokenService", "Started MainActivity with logout flag")
+            } catch (e: Exception) {
+                Log.e("TokenService", "Error during logout", e)
+            }
         }
+
+        // Stop the service after everything is done
+        stopSelf()
     }
 
     override fun onDestroy() {
