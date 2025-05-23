@@ -63,6 +63,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Share
+import android.content.Intent
+import com.purrytify.mobile.service.MusicNotificationService
 
 object MiniPlayerState {
     var mediaPlayer: MediaPlayer? = null
@@ -249,6 +251,10 @@ fun initializeMediaPlayer(context: android.content.Context) {
                     MiniPlayerState.isPlaying = false
                     MiniPlayerState.currentPosition = 0
                 }
+                val stopIntent = Intent(context, MusicNotificationService::class.java).apply {
+                    action = MusicNotificationService.ACTION_STOP
+                }
+                context.startService(stopIntent)
                 setOnErrorListener { mp, what, extra ->
                     android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
                     false
@@ -296,6 +302,9 @@ fun playSong(song: LocalSong, context: android.content.Context) {
                         MiniPlayerState.totalDuration = duration
                         start()
                         MiniPlayerState.isPlaying = true
+                        MusicNotificationService
+                        val intent = Intent(context, MusicNotificationService::class.java)
+                        context.startService(intent)
                     }
                     setOnErrorListener { mp, what, extra ->
                         android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")

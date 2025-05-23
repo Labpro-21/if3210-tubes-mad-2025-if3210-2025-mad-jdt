@@ -81,4 +81,5 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.glide)
     implementation(libs.coil.compose)
+    implementation("androidx.media:media:1.6.0")
 }
