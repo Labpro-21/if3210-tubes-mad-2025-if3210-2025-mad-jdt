@@ -57,54 +57,72 @@ class LocalSongViewModel(application: Application) : AndroidViewModel(applicatio
      * Extract metadata from audio file URI and add to database
      */
     fun addSong(audioFileUri: Uri, coverImageUri: Uri?, title: String? = null, artist: String? = null) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isLoading.value = true
+    viewModelScope.launch(Dispatchers.IO) {
+        _isLoading.value = true
+        try {
+            val context = getApplication<Application>()
+            val retriever = MediaMetadataRetriever()
+            
+            // Get the actual file path from content URI
+            val realPath = getRealPathFromUri(audioFileUri)
+            
             try {
-                // Get the real file path from the content URI
-                val context = getApplication<Application>()
-                val retriever = MediaMetadataRetriever()
+                retriever.setDataSource(context, audioFileUri)
                 
-                // Set the data source
-                try {
-                    retriever.setDataSource(context, audioFileUri)
-                    
-                    // Extract metadata
-                    val extractedTitle = title 
-                        ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) 
-                        ?: File(audioFileUri.toString()).nameWithoutExtension
-                    
-                    val extractedArtist = artist 
-                        ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) 
-                        ?: "Unknown Artist"
-                    
-                    val durationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                    val duration = durationString?.toLongOrNull() ?: 0
-                    
-                    val localSong = LocalSong(
-                        title = extractedTitle,
-                        artist = extractedArtist,
-                        duration = duration,
-                        filePath = audioFileUri.toString(),
-                        artworkPath = coverImageUri?.toString(),
-                        isLiked = false
-                    )
-                    
-                    repository.insert(localSong)
-                    _errorMessage.value = null
-                } catch (e: Exception) {
-                    Log.e("LocalSongViewModel", "Error extracting metadata: ${e.message}")
-                    _errorMessage.value = "Error adding song: ${e.message}"
-                } finally {
-                    retriever.release()
-                }
+                // Extract metadata
+                val extractedTitle = title 
+                    ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) 
+                    ?: File(audioFileUri.toString()).nameWithoutExtension
+                
+                val extractedArtist = artist 
+                    ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) 
+                    ?: "Unknown Artist"
+                
+                val durationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val duration = durationString?.toLongOrNull() ?: 0
+                
+                val localSong = LocalSong(
+                    title = extractedTitle,
+                    artist = extractedArtist,
+                    duration = duration,
+                    filePath = realPath ?: audioFileUri.toString(), // Use real path if available
+                    artworkPath = coverImageUri?.toString(),
+                    isLiked = false
+                )
+                
+                repository.insert(localSong)
+                _errorMessage.value = null
             } catch (e: Exception) {
-                Log.e("LocalSongViewModel", "Error adding song: ${e.message}")
+                Log.e("LocalSongViewModel", "Error extracting metadata: ${e.message}")
                 _errorMessage.value = "Error adding song: ${e.message}"
             } finally {
-                _isLoading.value = false
+                retriever.release()
             }
+        } catch (e: Exception) {
+            Log.e("LocalSongViewModel", "Error adding song: ${e.message}")
+            _errorMessage.value = "Error adding song: ${e.message}"
+        } finally {
+            _isLoading.value = false
         }
     }
+}
+
+private fun getRealPathFromUri(uri: Uri): String? {
+    val context = getApplication<Application>()
+    try {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val columnIndex = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                if (columnIndex != -1) {
+                    return cursor.getString(columnIndex)
+                }
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("LocalSongViewModel", "Error getting real path: ${e.message}")
+    }
+    return null
+}
     
     /**
      * Update existing song in the database
