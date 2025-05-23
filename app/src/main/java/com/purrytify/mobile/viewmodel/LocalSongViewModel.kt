@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.purrytify.mobile.data.room.AppDatabase
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.data.room.LocalSongRepository
+import com.purrytify.mobile.ui.MiniPlayerState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -158,7 +159,14 @@ private fun getRealPathFromUri(uri: Uri): String? {
     fun toggleLikeStatus(song: LocalSong) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                repository.updateLikeStatus(song.id, !song.isLiked)
+                // Create updated song copy with toggled like status
+                val updatedSong = song.copy(isLiked = !song.isLiked)
+                // Update in database
+                repository.update(updatedSong)
+                // Update MiniPlayerState if it's the current song
+                if (MiniPlayerState.currentSong?.id == song.id) {
+                    MiniPlayerState.currentSong = updatedSong
+                }
             } catch (e: Exception) {
                 Log.e("LocalSongViewModel", "Error updating like status: ${e.message}")
                 _errorMessage.value = "Error updating like status: ${e.message}"

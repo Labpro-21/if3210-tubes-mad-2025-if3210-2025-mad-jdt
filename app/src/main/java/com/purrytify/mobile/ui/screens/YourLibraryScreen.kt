@@ -837,17 +837,6 @@ fun LocalSongItem(
             )
         }
 
-        IconButton(onClick = { onLikeToggle() }) {
-            Icon(
-                painter = painterResource(
-                    id = if (song.isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
-                ),
-                contentDescription = "Like",
-                tint = if (song.isLiked) Color(0xFF1DB954) else Color.Gray,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
         Box {
             IconButton(onClick = { showOptions = true }) {
                 Icon(

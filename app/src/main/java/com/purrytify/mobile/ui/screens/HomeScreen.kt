@@ -342,18 +342,6 @@ fun RecentSongCard(
 
         Icon(
             painter = painterResource(
-                id = if (song.isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
-            ),
-            contentDescription = "Like",
-            tint = if (song.isLiked) Color(0xFF1DB954) else Color.Gray,
-            modifier = Modifier
-                .size(24.dp)
-                .clickable { /* Handle like toggle */ }
-                .padding(end = 8.dp)
-        )
-
-        Icon(
-            painter = painterResource(
                 id = if (isPlaying) R.drawable.pause else R.drawable.play_circle
             ),
             contentDescription = if (isPlaying) "Pause" else "Play",
