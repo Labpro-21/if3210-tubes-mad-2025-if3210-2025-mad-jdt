@@ -94,7 +94,6 @@ fun HomeScreen() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 18.dp)
-                    // Add padding at the bottom when mini player is visible
                     .padding(bottom = if (MiniPlayerState.currentSong != null) 0.dp else 0.dp)
             ) {
                 // New Songs Section First

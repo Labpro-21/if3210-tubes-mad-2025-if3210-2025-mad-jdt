@@ -204,7 +204,7 @@ fun MainContent(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
                 Column {
-                    MiniPlayer() // 56dp is the height of the BottomNavigationBar
+                    MiniPlayer()
                     BottomNavigationBar(navController = nestedNavController)
                 }
             }
