@@ -55,6 +55,10 @@ import android.os.Build
 import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.purrytify.mobile.data.room.LocalSong
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.purrytify.mobile.viewmodel.LocalSongViewModel
+
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
     error("Poppins font family not provided")
@@ -198,6 +202,7 @@ fun MainContent(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus = networkConnectivityObserver.observe().collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
+    val localSongViewModel: LocalSongViewModel = viewModel()
 
     // Initialize MediaPlayer
     LaunchedEffect(Unit) {
@@ -229,7 +234,12 @@ fun MainContent(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
                 Column {
-                    MiniPlayer()
+                    MiniPlayer(
+                        onDeleteClick = { song -> 
+                            localSongViewModel.deleteSong(song)
+                        },
+                        viewModel = localSongViewModel,
+                    )
                     BottomNavigationBar(navController = nestedNavController)
                 }
             }

@@ -65,6 +65,11 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Share
 import android.content.Intent
 import com.purrytify.mobile.service.MusicNotificationService
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.purrytify.mobile.viewmodel.LocalSongViewModel
 
 object MiniPlayerState {
     var mediaPlayer: MediaPlayer? = null
@@ -78,7 +83,9 @@ object MiniPlayerState {
 @Composable
 fun MiniPlayer(
     bottomPadding: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDeleteClick: (LocalSong) -> Unit,
+    viewModel: LocalSongViewModel 
 ) {
     LaunchedEffect(MiniPlayerState.isPlaying) {
         while (isActive && MiniPlayerState.isPlaying) {
@@ -98,7 +105,11 @@ fun MiniPlayer(
             animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
         )
     ) {
-        ExpandedPlayer(onDismiss = { MiniPlayerState.isExpanded = false })
+        ExpandedPlayer(
+            onDismiss = { MiniPlayerState.isExpanded = false },
+            onDeleteClick = onDeleteClick,
+            viewModel = viewModel
+        )
     }
 
     MiniPlayerState.currentSong?.let { song ->
@@ -334,7 +345,59 @@ fun playSong(song: LocalSong, context: android.content.Context) {
 @Composable
 fun ExpandedPlayer(
     onDismiss: () -> Unit,
+    onDeleteClick: (LocalSong) -> Unit,
+    viewModel: LocalSongViewModel 
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showOptions by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Text(
+                    "Delete Song",
+                    color = Color.White
+                )
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete \"${MiniPlayerState.currentSong?.title}\"?",
+                    color = Color.White
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        MiniPlayerState.currentSong?.let { song ->
+                            onDeleteClick(song)
+                            MiniPlayerState.isExpanded = false
+                        }
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Red
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showDeleteDialog = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.DarkGray
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = Color(0xFF282828),
+            titleContentColor = Color.White,
+            textContentColor = Color.White
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -428,6 +491,7 @@ fun ExpandedPlayer(
                             },
                             onClick = {
                                 showOptions = false
+                                showDeleteDialog = true
                             }
                         )
                         DropdownMenuItem(
@@ -455,6 +519,7 @@ fun ExpandedPlayer(
                             },
                             onClick = {
                                 showOptions = false
+                                showDeleteDialog = true
                             }
                         )
                     }
@@ -540,21 +605,21 @@ fun ExpandedPlayer(
 
                     // Like button
                     IconButton(
-                        onClick = {},
+                        onClick = { 
+                            MiniPlayerState.currentSong?.let { song ->
+                                // Toggle like status through ViewModel
+                                viewModel.toggleLikeStatus(song)
+                            }
+                        },
                         modifier = Modifier.size(48.dp)
                     ) {
+                        val isLiked = MiniPlayerState.currentSong?.isLiked == true
                         Icon(
                             painter = painterResource(
-                                id = if (song.isLiked) 
-                                    R.drawable.ic_heart_filled 
-                                else R.drawable.ic_heart_outline
+                                id = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
                             ),
-                            contentDescription = if (song.isLiked) 
-                                "Unlike" 
-                            else "Like",
-                            tint = if (song.isLiked) 
-                                Color(0xFF1DB954) 
-                            else Color.Gray,
+                            contentDescription = if (isLiked) "Unlike" else "Like",
+                            tint = if (isLiked) Color(0xFF1DB954) else Color.Gray,
                             modifier = Modifier.size(32.dp)
                         )
                     }
