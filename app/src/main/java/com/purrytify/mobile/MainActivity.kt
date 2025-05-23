@@ -49,11 +49,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d("MainActivity", "onCreate: MainActivity is starting!")
+
+        // Handle logout intent
+        if (intent?.getBooleanExtra("isLogout", false) == true) {
+            Log.d("MainActivity", "Received logout intent, clearing tokens")
+            // Clear tokens synchronously to ensure they're cleared before UI setup
+            TokenManager(applicationContext).clearTokensSync()
+        }
+
         enableEdgeToEdge()
 
         // --- Dependencies ---
         val tokenManager = TokenManager(applicationContext)
-        val retrofit = ApiClient.buildRetrofit()
+        val retrofit = ApiClient.buildRetrofit(tokenManager)  // Pass tokenManager here
         val authService = ApiClient.createAuthService(retrofit)
         val authRepository = AuthRepository(tokenManager, authService)
         // --- End Dependencies ---
@@ -80,15 +88,9 @@ class MainActivity : ComponentActivity() {
                         navigation(startDestination = "splash", route = "auth") {
                             composable("splash") {
                                 SplashScreen(
-                                    onSplashScreenFinish = {
-                                        Log.d(
-                                            "MainActivity",
-                                            "Splash finished, navigating to login"
-                                        )
-                                        navController.navigate("login") {
-                                            popUpTo("splash") { inclusive = true }
-                                        }
-                                    }
+                                    tokenManager = tokenManager,
+                                    authRepository = authRepository,
+                                    navController = navController
                                 )
                             }
                             composable("login") {

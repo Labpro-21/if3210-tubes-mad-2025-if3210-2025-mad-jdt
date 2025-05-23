@@ -36,6 +36,15 @@ class TokenManager(private val context: Context) {
         }
     }
 
+    fun clearTokensSync() {
+        runBlocking {
+            context.dataStore.edit { preferences ->
+                preferences.remove(ACCESS_TOKEN_KEY)
+                preferences.remove(REFRESH_TOKEN_KEY)
+            }
+        }
+    }
+
     fun getAccessToken(): String? {
         return runBlocking {
             context.dataStore.data.map { preferences ->

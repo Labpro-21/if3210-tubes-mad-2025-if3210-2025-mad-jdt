@@ -19,7 +19,7 @@ data class LoginResponse(
 
 data class RefreshTokenRequest(val refreshToken: String)
 
-data class RefreshTokenResponse(val access: String, val refresh: String)
+data class RefreshTokenResponse(val accessToken: String, val refreshToken: String)
 
 data class ProfileResponse(
     val id: Int, // Or String, depending on your API
