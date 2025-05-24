@@ -3,6 +3,7 @@ package com.purrytify.mobile.ui.screens
 import android.media.MediaPlayer
 import android.net.Uri
 import android.widget.ImageView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -39,9 +40,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.ui.playSong
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+import androidx.navigation.NavHostController
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    navController: NavHostController
+) {
     val context = LocalContext.current
     val localSongViewModel: LocalSongViewModel = viewModel()
     val allSongs by localSongViewModel.allSongs.collectAsState()
@@ -98,6 +104,52 @@ fun HomeScreen() {
             ) {
                 // New Songs Section First
                 item {
+                    Text(
+                        text = "Charts",
+                        style = TextStyle(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = LocalPoppinsFont.current,
+                            color = Color.White
+                        ),
+                        modifier = Modifier.padding(top = 24.dp, bottom = 16.dp)
+                    )
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    ) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .clickable { 
+                                        navController.navigate("global_song")  // Navigate to GlobalSong screen
+                                    }
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.top_50),
+                                    contentDescription = "Top 50 Cover",
+                                    modifier = Modifier
+                                        .size(150.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+
+                        item {
+                            Image(
+                                painter = painterResource(id = R.drawable.top_50),
+                                contentDescription = "Top 50 Cover",
+                                modifier = Modifier
+                                    .size(150.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+
                     Text(
                         text = "New Songs",
                         style = TextStyle(
