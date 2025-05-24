@@ -41,6 +41,7 @@ import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
+import com.purrytify.mobile.ui.screens.GlobalSong
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.delay
@@ -57,7 +58,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.purrytify.mobile.data.room.LocalSong
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.purrytify.mobile.data.createSongRepository
+import com.purrytify.mobile.ui.screens.GlobalSongViewModel
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -249,7 +257,9 @@ fun MainContent(
                 startDestination = BottomNavItem.Home.route,
                 modifier = Modifier.padding(innerPadding)
             ) {
-                composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Home.route) { HomeScreen(
+                    navController = nestedNavController
+                ) }
                 composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
@@ -264,6 +274,15 @@ fun MainContent(
                                 }
                             }
                         }
+                    )
+                }
+                composable("global_song") {
+                    val songRepository = remember { 
+                        createSongRepository(tokenManager)
+                    }
+                    GlobalSong(
+                        navController = nestedNavController,
+                        repository = songRepository
                     )
                 }
             }

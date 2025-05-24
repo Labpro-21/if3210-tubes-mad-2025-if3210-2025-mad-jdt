@@ -42,4 +42,8 @@ object ApiClient {
     fun createAuthService(retrofit: Retrofit): AuthService {
         return retrofit.create(AuthService::class.java)
     }
+
+    fun createSongService(retrofit: Retrofit): SongService {
+        return retrofit.create(SongService::class.java)
+    }
 }

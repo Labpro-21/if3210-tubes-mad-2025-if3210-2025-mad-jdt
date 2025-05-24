@@ -78,6 +78,7 @@ object MiniPlayerState {
     var currentPosition by mutableStateOf(0)
     var totalDuration by mutableStateOf(0)
     var isExpanded by mutableStateOf(false)
+    var currentUrl: String? by mutableStateOf(null)
 }
 
 @Composable
@@ -281,54 +282,50 @@ fun initializeMediaPlayer(context: android.content.Context) {
 fun playSong(song: LocalSong, context: android.content.Context) {
     try {
         android.util.Log.d("MiniPlayer", "Attempting to play song: ${song.title}")
-        android.util.Log.d("MiniPlayer", "File path: ${song.filePath}")
-        
+        android.util.Log.d("MiniPlayer", "URL/Path: ${song.filePath}")
+
         if (MiniPlayerState.mediaPlayer == null) {
             initializeMediaPlayer(context)
         }
-        
-        if (MiniPlayerState.currentSong?.id == song.id) {
-            if (MiniPlayerState.mediaPlayer?.isPlaying == true) {
-                MiniPlayerState.mediaPlayer?.pause()
-                MiniPlayerState.isPlaying = false
-            } else {
-                MiniPlayerState.mediaPlayer?.start()
-                MiniPlayerState.isPlaying = true
-            }
-        } else {
-            MiniPlayerState.currentSong = song
-            MiniPlayerState.mediaPlayer?.apply {
-                reset()
-                try {
-                    // Try using direct file path first
-                    if (File(song.filePath).exists()) {
-                        setDataSource(song.filePath)
-                    } else {
-                        // Fallback to using URI if file path doesn't exist
-                        setDataSource(context, Uri.parse(song.filePath))
-                    }
-                    
-                    prepareAsync()
-                    setOnPreparedListener {
-                        MiniPlayerState.totalDuration = duration
-                        start()
-                        MiniPlayerState.isPlaying = true
-                        MusicNotificationService
-                        val intent = Intent(context, MusicNotificationService::class.java)
-                        context.startService(intent)
-                    }
-                    setOnErrorListener { mp, what, extra ->
-                        android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
-                        android.widget.Toast.makeText(
-                            context,
-                            "Error playing song: Error code $what",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                        false
-                    }
-                } catch (e: Exception) {
-                    throw Exception("Could not load audio file: ${e.message}")
+
+        // Reset and prepare new song
+        MiniPlayerState.mediaPlayer?.apply {
+            reset()
+            try {
+                // Set the data source
+                setDataSource(song.filePath)
+                MiniPlayerState.currentSong = song
+                MiniPlayerState.currentUrl = song.filePath
+
+                // Set listeners
+                setOnPreparedListener { mp ->
+                    android.util.Log.d("MiniPlayer", "MediaPlayer prepared, starting playback")
+                    MiniPlayerState.totalDuration = mp.duration
+                    mp.start()
+                    MiniPlayerState.isPlaying = true
                 }
+
+                setOnErrorListener { mp, what, extra ->
+                    android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
+                    android.widget.Toast.makeText(
+                        context,
+                        "Error playing song: $what",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    false
+                }
+
+                // Prepare async
+                android.util.Log.d("MiniPlayer", "Preparing MediaPlayer...")
+                prepareAsync()
+
+            } catch (e: Exception) {
+                android.util.Log.e("MiniPlayer", "Error setting data source: ${e.message}", e)
+                android.widget.Toast.makeText(
+                    context,
+                    "Error loading song: ${e.message}",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         }
     } catch (e: Exception) {
