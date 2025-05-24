@@ -7,6 +7,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import java.util.Date
 import com.purrytify.mobile.data.room.TopSong
+import com.purrytify.mobile.data.room.CountrySong
 
 data class LoginRequest(
     val email: String,
@@ -50,3 +51,9 @@ interface SongService {
     @GET("api/top-songs/global")
     suspend fun getTopSongs(): Response<List<TopSong>>
 }
+
+interface CountrySongService {
+    @GET("api/top-songs/ID")
+    suspend fun getCountrySongs(): Response<List<CountrySong>>
+}
+

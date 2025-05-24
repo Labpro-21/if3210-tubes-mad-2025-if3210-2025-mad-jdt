@@ -42,6 +42,7 @@ import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.screens.GlobalSong
+import com.purrytify.mobile.ui.screens.CountrySong
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.delay
@@ -59,12 +60,10 @@ import androidx.core.content.ContextCompat
 import com.purrytify.mobile.data.room.LocalSong
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.purrytify.mobile.data.createSongRepository
+import com.purrytify.mobile.data.createCountrySongRepository
 import com.purrytify.mobile.ui.screens.GlobalSongViewModel
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+
 
 
 // Composition Local for Poppins Font
@@ -283,6 +282,15 @@ fun MainContent(
                     GlobalSong(
                         navController = nestedNavController,
                         repository = songRepository
+                    )
+                }
+                composable("country_song") {
+                    val countrySongRepository = remember {
+                        createCountrySongRepository(tokenManager)
+                    }
+                    CountrySong(
+                        navController = nestedNavController,
+                        repository = countrySongRepository
                     )
                 }
             }

@@ -140,13 +140,21 @@ fun HomeScreen(
                         }
 
                         item {
-                            Image(
-                                painter = painterResource(id = R.drawable.top_50),
-                                contentDescription = "Top 50 Cover",
+                            Box(
                                 modifier = Modifier
-                                    .size(150.dp),
-                                contentScale = ContentScale.Crop
-                            )
+                                    .clickable {
+                                        navController.navigate("country_song")  // Navigate to GlobalSong screen
+                                    }
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.country_top_50),
+                                    contentDescription = "Country Top 50 Cover",
+                                    modifier = Modifier
+                                        .size(150.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         }
                     }
 

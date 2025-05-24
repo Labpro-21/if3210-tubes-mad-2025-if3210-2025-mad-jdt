@@ -8,11 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class SongRepository(private val songService: SongService) {
-    
-    /**
-     * Fetches top songs from the API
-     * @return Result containing List<TopSong> if successful, or Exception if failed
-     */
+
     suspend fun getTopSongs(): Result<List<TopSong>> = withContext(Dispatchers.IO) {
         try {
             val response = songService.getTopSongs()
