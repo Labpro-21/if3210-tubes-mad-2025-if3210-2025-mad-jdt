@@ -46,4 +46,8 @@ object ApiClient {
     fun createSongService(retrofit: Retrofit): SongService {
         return retrofit.create(SongService::class.java)
     }
+
+    fun createCountrySongService(retrofit: Retrofit): CountrySongService {
+        return retrofit.create(CountrySongService::class.java)
+    }
 }

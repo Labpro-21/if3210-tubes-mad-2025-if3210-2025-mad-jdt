@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberImagePainter
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.clip
@@ -37,27 +38,28 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.purrytify.mobile.R
-import com.purrytify.mobile.data.SongRepository
+import com.purrytify.mobile.data.CountrySongRepository
 import com.purrytify.mobile.data.room.TopSong
+import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.ui.playSong
 
 
 @Composable
-fun GlobalSong(
+fun CountrySong(
     navController: NavController,
-    repository: SongRepository
+    repository: CountrySongRepository
 ) {
-    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<GlobalSongViewModel>(
-        factory = GlobalSongViewModel.provideFactory(repository)
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<CountrySongViewModel>(
+        factory = CountrySongViewModel.provideFactory(repository)
     )
     
-    val topSongs by viewModel.topSongs.collectAsState()
+    val countrySongs by viewModel.countrySongs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     
     
     val gradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFF1C8075), Color(0xFF1D4569), Color(0xFF121212)),
+        colors = listOf(Color(0xFFf36a78), Color(0xFFEF2D40), Color(0xFF121212)),
         startY = 0f, 
         endY = 1000f
     )
@@ -95,7 +97,7 @@ fun GlobalSong(
 
             // Cover dan judul
             Image(
-                painter = painterResource(id = R.drawable.top_50),
+                painter = painterResource(id = R.drawable.country_top_50),
                 contentDescription = "Top 50 Cover",
                 modifier = Modifier
                     .size(160.dp)
@@ -106,7 +108,7 @@ fun GlobalSong(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Your daily update of the most played tracks right now – Global.",
+                text = "Your daily update of the most played tracks right now on your country.",
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.8f)
             )
@@ -154,23 +156,45 @@ fun GlobalSong(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Daftar lagu
-            LazyColumn {
-                itemsIndexed(topSongs) { index, song ->
-                    SongItem(
-                        index = index + 1,
-                        song = song
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                }
+                countrySongs.isEmpty() -> {
+                    Text(
+                        text = "No songs available",
+                        color = Color.White,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .align(Alignment.CenterHorizontally)
                     )
                 }
+                else -> {
+                    LazyColumn {
+                        itemsIndexed(countrySongs) { index, song ->
+                            Log.d("CountrySong", "Rendering song: ${song.title}")
+                            CountrySongItem(
+                                index = index + 1,
+                                song = song
+                            )
+                        }
+                    }
+                }
             }
+            
         }
     }
 }
 
 @Composable
-fun SongItem(
+fun CountrySongItem(
     index: Int,
-    song: TopSong
+    song: CountrySong
 ) {
     val context = LocalContext.current
     
