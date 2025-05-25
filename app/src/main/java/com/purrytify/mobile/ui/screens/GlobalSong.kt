@@ -165,7 +165,7 @@ fun GlobalSong(
                     SongItem(
                         index = index + 1,
                         song = song,
-                        viewModel = viewModel
+                        viewModel = viewModel,
                         navController = navController
 
                     )
@@ -179,7 +179,7 @@ fun GlobalSong(
 fun SongItem(
     index: Int,
     song: TopSong,
-    viewModel: GlobalSongViewModel
+    viewModel: GlobalSongViewModel,
     navController: NavController
 ) {
     val context = LocalContext.current
