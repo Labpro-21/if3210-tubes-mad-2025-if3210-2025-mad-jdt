@@ -8,7 +8,6 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.bumptech.glide.Glide
@@ -20,8 +19,8 @@ import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.data.room.TopSong
 import com.purrytify.mobile.ui.MiniPlayerState
-import kotlinx.coroutines.*
 import com.purrytify.mobile.utils.ListeningTracker
+import kotlinx.coroutines.*
 
 class MusicNotificationService : Service() {
 
@@ -202,6 +201,7 @@ class MusicNotificationService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(artist)
+            .setSubText(progressText)
             .setSmallIcon(R.drawable.splash_logo)
             .setContentIntent(openPlayerPendingIntent)
             .addAction(R.drawable.skip_previous, "Previous", prevIntent)
@@ -212,7 +212,7 @@ class MusicNotificationService : Service() {
             .setStyle(
                 MediaStyle()
                     .setShowActionsInCompactView(0, 1, 2)
-            .setSubText(progressText)
+            )
             .setProgress(100, progressPercentage, false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
