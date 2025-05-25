@@ -4,16 +4,15 @@ import android.app.*
 import android.content.*
 import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
-import android.media.MediaPlayer
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.purrytify.mobile.R
+import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.data.room.TopSong
-import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.utils.ListeningTracker
 
@@ -57,7 +56,15 @@ class MusicNotificationService : Service() {
                 player.start()
                 MiniPlayerState.isPlaying = true
                 MiniPlayerState.currentSong?.let { song ->
-                    ListeningTracker.resumeListening(song)
+                    // Convert to LocalSong for ListeningTracker
+                    val localSong =
+                            when (song) {
+                                is LocalSong -> song
+                                is TopSong -> song.toLocalSong()
+                                is CountrySong -> song.toLocalSong()
+                                else -> return@let
+                            }
+                    ListeningTracker.resumeListening(localSong)
                 }
             }
         }
@@ -84,37 +91,57 @@ class MusicNotificationService : Service() {
         val playPauseIcon = if (isPlaying) R.drawable.pause else R.drawable.play_circle
         val playPauseLabel = if (isPlaying) "Pause" else "Play"
 
-        val playPauseIntent = PendingIntent.getService(
-            this, 0, Intent(this, javaClass).setAction(ACTION_PLAY_PAUSE), PendingIntent.FLAG_IMMUTABLE
-        )
-        val nextIntent = PendingIntent.getService(
-            this, 1, Intent(this, javaClass).setAction(ACTION_NEXT), PendingIntent.FLAG_IMMUTABLE
-        )
-        val prevIntent = PendingIntent.getService(
-            this, 2, Intent(this, javaClass).setAction(ACTION_PREV), PendingIntent.FLAG_IMMUTABLE
-        )
-        val stopIntent = PendingIntent.getService(
-            this, 3, Intent(this, javaClass).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE
-        )
+        val playPauseIntent =
+                PendingIntent.getService(
+                        this,
+                        0,
+                        Intent(this, javaClass).setAction(ACTION_PLAY_PAUSE),
+                        PendingIntent.FLAG_IMMUTABLE
+                )
+        val nextIntent =
+                PendingIntent.getService(
+                        this,
+                        1,
+                        Intent(this, javaClass).setAction(ACTION_NEXT),
+                        PendingIntent.FLAG_IMMUTABLE
+                )
+        val prevIntent =
+                PendingIntent.getService(
+                        this,
+                        2,
+                        Intent(this, javaClass).setAction(ACTION_PREV),
+                        PendingIntent.FLAG_IMMUTABLE
+                )
+        val stopIntent =
+                PendingIntent.getService(
+                        this,
+                        3,
+                        Intent(this, javaClass).setAction(ACTION_STOP),
+                        PendingIntent.FLAG_IMMUTABLE
+                )
 
-        val openPlayerIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
-            PendingIntent.getActivity(this, 4, it, PendingIntent.FLAG_IMMUTABLE)
-        }
+        val openPlayerIntent =
+                packageManager.getLaunchIntentForPackage(packageName)?.let {
+                    PendingIntent.getActivity(this, 4, it, PendingIntent.FLAG_IMMUTABLE)
+                }
 
-        val (title, artist, artworkPath) = when (song) {
-            is LocalSong -> Triple(song.title, song.artist, song.artworkPath)
-            is TopSong -> Triple(song.title, song.artist, song.artwork)
-            is CountrySong -> Triple(song.title, song.artist, song.artwork)
-            else -> Triple("No Song", "Unknown Artist", null)
-        }
+        val (title, artist, artworkPath) =
+                when (song) {
+                    is LocalSong -> Triple(song.title, song.artist, song.artworkPath)
+                    is TopSong -> Triple(song.title, song.artist, song.artwork)
+                    is CountrySong -> Triple(song.title, song.artist, song.artwork)
+                    else -> Triple("No Song", "Unknown Artist", null)
+                }
 
-        val largeIcon = artworkPath?.let {
-            try {
-                BitmapFactory.decodeFile(it)
-            } catch (e: Exception) {
-                null
-            }
-        } ?: BitmapFactory.decodeResource(resources, R.drawable.placeholder_album)
+        val largeIcon =
+                artworkPath?.let {
+                    try {
+                        BitmapFactory.decodeFile(it)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                        ?: BitmapFactory.decodeResource(resources, R.drawable.placeholder_album)
 
         fun formatTime(ms: Int): String {
             val totalSec = ms / 1000
@@ -123,33 +150,31 @@ class MusicNotificationService : Service() {
             return "%d:%02d".format(min, sec)
         }
 
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(artist)
-            .setSmallIcon(R.drawable.splash_logo)
-            .setLargeIcon(largeIcon)
-            .setContentIntent(openPlayerIntent)
-            .addAction(R.drawable.skip_previous, "Prev", prevIntent)
-            .addAction(playPauseIcon, playPauseLabel, playPauseIntent)
-            .addAction(R.drawable.skip_next, "Next", nextIntent)
-            .addAction(R.drawable.ic_close, "Stop", stopIntent)
-            .setDeleteIntent(stopIntent)
-            .setStyle(
-                MediaStyle()
-                    .setShowActionsInCompactView(0, 1, 2, 3)
-            )
-            .setSubText("${formatTime(currentPositionMs)} / ${formatTime(durationMs)}")
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(isPlaying)
-            .setOnlyAlertOnce(true)
-            .setAutoCancel(false)
-            .setColor(0xFF181818.toInt())
+        val builder =
+                NotificationCompat.Builder(this, CHANNEL_ID)
+                        .setContentTitle(title)
+                        .setContentText(artist)
+                        .setSmallIcon(R.drawable.splash_logo)
+                        .setLargeIcon(largeIcon)
+                        .setContentIntent(openPlayerIntent)
+                        .addAction(R.drawable.skip_previous, "Prev", prevIntent)
+                        .addAction(playPauseIcon, playPauseLabel, playPauseIntent)
+                        .addAction(R.drawable.skip_next, "Next", nextIntent)
+                        .addAction(R.drawable.ic_close, "Stop", stopIntent)
+                        .setDeleteIntent(stopIntent)
+                        .setStyle(MediaStyle().setShowActionsInCompactView(0, 1, 2, 3))
+                        .setSubText("${formatTime(currentPositionMs)} / ${formatTime(durationMs)}")
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                        .setOngoing(isPlaying)
+                        .setOnlyAlertOnce(true)
+                        .setAutoCancel(false)
+                        .setColor(0xFF181818.toInt())
 
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
-                NOTIFICATION_ID,
-                builder.build(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    NOTIFICATION_ID,
+                    builder.build(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             )
         } else {
             startForeground(NOTIFICATION_ID, builder.build())
@@ -158,9 +183,12 @@ class MusicNotificationService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID, "Music Player", NotificationManager.IMPORTANCE_LOW
-            )
+            val channel =
+                    NotificationChannel(
+                            CHANNEL_ID,
+                            "Music Player",
+                            NotificationManager.IMPORTANCE_LOW
+                    )
             channel.description = "Purrytify Music Player Controls"
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
