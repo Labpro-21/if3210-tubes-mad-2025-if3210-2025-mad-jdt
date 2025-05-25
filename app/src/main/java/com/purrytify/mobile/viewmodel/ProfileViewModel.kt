@@ -11,6 +11,7 @@ import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 // --- UI State ---
 sealed class ProfileUiState {
@@ -21,6 +22,14 @@ sealed class ProfileUiState {
     object NetworkError : ProfileUiState() // Add this state
 }
 
+// --- Edit Profile State ---
+sealed class EditProfileState {
+    object Initial : EditProfileState()
+    object Loading : EditProfileState()
+    object Success : EditProfileState()
+    data class Error(val message: String) : EditProfileState()
+}
+
 // --- ViewModel ---
 class ProfileViewModel(
     private val authRepository: AuthRepository,
@@ -29,6 +38,9 @@ class ProfileViewModel(
 
     private val _profileUiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Initial)
     val profileUiState: StateFlow<ProfileUiState> = _profileUiState
+    
+    private val _editProfileState = MutableStateFlow<EditProfileState>(EditProfileState.Initial)
+    val editProfileState: StateFlow<EditProfileState> = _editProfileState
     
     private val _networkStatus = MutableStateFlow(NetworkConnectivityObserver.Status.AVAILABLE)
     val networkStatus: StateFlow<NetworkConnectivityObserver.Status> = _networkStatus
@@ -73,6 +85,28 @@ class ProfileViewModel(
                 } else {
                     _profileUiState.value = ProfileUiState.Error(exception.message ?: "Unknown error")
                 }
+            }
+        }
+    }
+
+    fun editProfile(location: String?, profilePhoto: File?) {
+        if (!networkObserver.isNetworkAvailable()) {
+            _editProfileState.value = EditProfileState.Error("No network connection")
+            return
+        }
+
+        viewModelScope.launch {
+            _editProfileState.value = EditProfileState.Loading
+            try {
+                val result = authRepository.editProfile(location, profilePhoto)
+                result.onSuccess { profile ->
+                    _editProfileState.value = EditProfileState.Success
+                    _profileUiState.value = ProfileUiState.Success(profile)
+                }.onFailure { exception ->
+                    _editProfileState.value = EditProfileState.Error(exception.message ?: "Unknown error")
+                }
+            } catch (e: Exception) {
+                _editProfileState.value = EditProfileState.Error(e.message ?: "Unknown error")
             }
         }
     }

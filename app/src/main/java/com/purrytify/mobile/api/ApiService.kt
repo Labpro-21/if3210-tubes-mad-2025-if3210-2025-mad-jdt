@@ -1,10 +1,15 @@
 package com.purrytify.mobile.api
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Part
 import java.util.Date
 
 data class LoginRequest(
@@ -20,6 +25,10 @@ data class LoginResponse(
 data class RefreshTokenRequest(val refreshToken: String)
 
 data class RefreshTokenResponse(val accessToken: String, val refreshToken: String)
+
+data class EditProfileResponse(
+    val message: String
+)
 
 data class ProfileResponse(
     val id: Int, // Or String, depending on your API
@@ -40,7 +49,17 @@ interface AuthService {
 
     @POST("api/refresh-token")
     suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
+}
 
+interface UserService {
     @GET("api/profile")
     suspend fun getProfile(@Header("Authorization") authorization: String): Response<ProfileResponse>
+
+    @Multipart
+    @PATCH("api/profile")
+    suspend fun editProfile(
+        @Header("Authorization") authorization: String,
+        @Part("location") location: RequestBody?,
+        @Part profilePhoto: MultipartBody.Part?
+    ): Response<EditProfileResponse>
 }

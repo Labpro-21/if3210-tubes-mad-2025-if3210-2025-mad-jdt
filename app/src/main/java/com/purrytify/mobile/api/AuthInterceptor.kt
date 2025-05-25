@@ -37,8 +37,10 @@ class AuthInterceptor(
                 }
 
                 try {
+                    Log.d("AuthInterceptor", "Refreshing token with refresh token: $refreshToken")
                     val refreshResponse =
                         authService.refreshToken(RefreshTokenRequest(refreshToken))
+                    Log.d("AuthInterceptor", "Token refresh response: $refreshResponse")
                     if (refreshResponse.isSuccessful && refreshResponse.body() != null) {
                         val tokens = refreshResponse.body()!!
                         tokenManager.saveTokens(tokens.accessToken, tokens.refreshToken)
