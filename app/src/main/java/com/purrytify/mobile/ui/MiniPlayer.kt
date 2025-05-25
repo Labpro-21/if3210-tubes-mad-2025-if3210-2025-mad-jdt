@@ -7,11 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,11 +26,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.bumptech.glide.Glide
 import com.purrytify.mobile.LocalPoppinsFont
 import com.purrytify.mobile.R
+import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.data.room.LocalSong
+import com.purrytify.mobile.data.room.TopSong
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import androidx.core.net.toUri
-import java.io.File
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedVisibility
@@ -48,10 +47,6 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -60,29 +55,36 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Share
 import android.content.Intent
+import android.graphics.Bitmap
+import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.filled.QrCode
 import com.purrytify.mobile.service.MusicNotificationService
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import androidx.compose.material.icons.filled.Speaker
-import androidx.compose.material.icons.materialIcon
-import androidx.room.util.TableInfo
 import com.purrytify.mobile.ui.AudioOutputBottomSheet
 import com.purrytify.mobile.utils.ListeningTracker
 import com.purrytify.mobile.utils.OutputDevice
 import com.purrytify.mobile.utils.setAudioOutput
 import com.purrytify.mobile.utils.getAvailableOutputDevices
+import com.purrytify.mobile.utils.shareSong
+import com.purrytify.mobile.utils.generateQrCode
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.window.Dialog
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
 
 object MiniPlayerState {
     var mediaPlayer: MediaPlayer? = null
-    var currentSong: LocalSong? by mutableStateOf(null)
+    var currentSong: Any? by mutableStateOf(null)
     var isPlaying by mutableStateOf(false)
     var currentPosition by mutableStateOf(0)
     var totalDuration by mutableStateOf(0)
@@ -95,25 +97,32 @@ fun MiniPlayer(
     bottomPadding: Int = 0,
     modifier: Modifier = Modifier,
     onDeleteClick: (LocalSong) -> Unit,
-    viewModel: LocalSongViewModel 
+    viewModel: LocalSongViewModel
 ) {
+    val context = LocalContext.current
+
     LaunchedEffect(MiniPlayerState.isPlaying) {
         while (isActive && MiniPlayerState.isPlaying) {
-            MiniPlayerState.currentPosition = MiniPlayerState.mediaPlayer?.currentPosition ?: 0
+            MiniPlayerState.currentPosition =
+                MiniPlayerState.mediaPlayer?.currentPosition ?: 0
             delay(100)
         }
     }
 
     AnimatedVisibility(
         visible = MiniPlayerState.isExpanded,
-        enter = slideInVertically(
-            initialOffsetY = { fullHeight -> fullHeight },
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-        ),
-        exit = slideOutVertically(
-            targetOffsetY = { fullHeight -> fullHeight },
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-        )
+        enter =
+            slideInVertically(
+                initialOffsetY = { fullHeight -> fullHeight },
+                animationSpec =
+                    tween(durationMillis = 300, easing = FastOutSlowInEasing)
+            ),
+        exit =
+            slideOutVertically(
+                targetOffsetY = { fullHeight -> fullHeight },
+                animationSpec =
+                    tween(durationMillis = 300, easing = FastOutSlowInEasing)
+            )
     ) {
         ExpandedPlayer(
             onDismiss = { MiniPlayerState.isExpanded = false },
@@ -123,38 +132,64 @@ fun MiniPlayer(
     }
 
     MiniPlayerState.currentSong?.let { song ->
+        val title =
+            when (song) {
+                is LocalSong -> song.title
+                is TopSong -> song.title
+                is CountrySong -> song.title
+                else -> ""
+            }
+        val artist =
+            when (song) {
+                is LocalSong -> song.artist
+                is TopSong -> song.artist
+                is CountrySong -> song.artist
+                else -> ""
+            }
+        val artworkPath =
+            when (song) {
+                is LocalSong -> song.artworkPath
+                is TopSong -> song.artwork
+                is CountrySong -> song.artwork
+                else -> null
+            }
+
         Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .background(Color(0xFF282828))
-                .clickable { MiniPlayerState.isExpanded = true }
-                .padding(bottom = bottomPadding.dp)
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF282828))
+                    .clickable { MiniPlayerState.isExpanded = true }
+                    .padding(bottom = bottomPadding.dp)
         ) {
             LinearProgressIndicator(
-                progress = if (MiniPlayerState.totalDuration > 0) 
-                    MiniPlayerState.currentPosition.toFloat() / MiniPlayerState.totalDuration 
-                else 0f,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
+                progress =
+                    if (MiniPlayerState.totalDuration > 0)
+                        MiniPlayerState.currentPosition.toFloat() /
+                            MiniPlayerState.totalDuration
+                    else 0f,
+                modifier = Modifier.fillMaxWidth().height(2.dp),
                 color = Color(0xFF1DB954),
                 trackColor = Color.DarkGray
             )
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .padding(horizontal = 16.dp),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .height(58.dp)
+                        .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color.DarkGray, RoundedCornerShape(4.dp)),
+                    modifier =
+                        Modifier.size(40.dp)
+                            .background(
+                                Color.DarkGray,
+                                RoundedCornerShape(4.dp)
+                            ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (song.artworkPath != null) {
+                    if (artworkPath != null) {
                         AndroidView(
                             factory = { ctx ->
                                 ImageView(ctx).apply {
@@ -163,7 +198,7 @@ fun MiniPlayer(
                             },
                             update = { imageView ->
                                 Glide.with(imageView)
-                                    .load(song.artworkPath.toUri())
+                                    .load(artworkPath.toUri())
                                     .centerCrop()
                                     .placeholder(R.drawable.placeholder_album)
                                     .into(imageView)
@@ -172,7 +207,8 @@ fun MiniPlayer(
                         )
                     } else {
                         Icon(
-                            painter = painterResource(id = R.drawable.play_circle),
+                            painter =
+                                painterResource(id = R.drawable.play_circle),
                             contentDescription = "Music Icon",
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
@@ -182,70 +218,82 @@ fun MiniPlayer(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = song.title,
-                        style = TextStyle(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = LocalPoppinsFont.current,
-                            color = Color.White
-                        ),
+                        text = title,
+                        style =
+                            TextStyle(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = LocalPoppinsFont.current,
+                                color = Color.White
+                            ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = song.artist,
-                            style = TextStyle(
-                                fontSize = 12.sp,
-                                fontFamily = LocalPoppinsFont.current,
-                                color = Color.Gray
-                            ),
+                            text = artist,
+                            style =
+                                TextStyle(
+                                    fontSize = 12.sp,
+                                    fontFamily = LocalPoppinsFont.current,
+                                    color = Color.Gray
+                                ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
 
                         Text(
-                            text = "${formatTimeMs(MiniPlayerState.currentPosition)} / ${formatTimeMs(MiniPlayerState.totalDuration)}",
-                            style = TextStyle(
-                                fontSize = 12.sp,
-                                fontFamily = LocalPoppinsFont.current,
-                                color = Color.Gray
-                            )
+                            text =
+                                "${formatTimeMs(MiniPlayerState.currentPosition)} / ${formatTimeMs(MiniPlayerState.totalDuration)}",
+                            style =
+                                TextStyle(
+                                    fontSize = 12.sp,
+                                    fontFamily = LocalPoppinsFont.current,
+                                    color = Color.Gray
+                                )
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                IconButton(
-                    onClick = { /* share song */ }
+                if (MiniPlayerState.currentSong is TopSong ||
+                    MiniPlayerState.currentSong is CountrySong
                 ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "share song",
-                        tint = Color.White,
-                    )
+                    val onlineSong = MiniPlayerState.currentSong
+                    val songId =
+                        when (onlineSong) {
+                            is TopSong -> onlineSong.id
+                            is CountrySong -> onlineSong.id
+                            else -> return
+                        }
+                    IconButton(onClick = { shareSong(context, songId) }) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "share song",
+                            tint = Color.White,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Icon(
-                    painter = painterResource(
-                        id = if (MiniPlayerState.isPlaying) R.drawable.pause else R.drawable.play_circle
-                    ),
-                    contentDescription = if (MiniPlayerState.isPlaying) "Pause" else "Play",
+                    painter =
+                        painterResource(
+                            id =
+                                if (MiniPlayerState.isPlaying) R.drawable.pause
+                                else R.drawable.play_circle
+                        ),
+                    contentDescription =
+                        if (MiniPlayerState.isPlaying) "Pause" else "Play",
                     tint = Color(0xFF1DB954),
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable {
+                    modifier =
+                        Modifier.size(32.dp).clickable {
                             if (MiniPlayerState.isPlaying) {
                                 MiniPlayerState.mediaPlayer?.pause()
                                 MiniPlayerState.isPlaying = false
@@ -283,39 +331,60 @@ private fun seekToPosition(position: Float) {
 fun initializeMediaPlayer(context: android.content.Context) {
     try {
         if (MiniPlayerState.mediaPlayer == null) {
-            MiniPlayerState.mediaPlayer = MediaPlayer().apply {
-                setOnCompletionListener {
-                    MiniPlayerState.isPlaying = false
-                    MiniPlayerState.currentPosition = 0
-                    ListeningTracker.stopListening()
+            MiniPlayerState.mediaPlayer =
+                MediaPlayer().apply {
+                    setOnCompletionListener {
+                        MiniPlayerState.isPlaying = false
+                        MiniPlayerState.currentPosition = 0
+                        ListeningTracker.stopListening()
+                    }
+                    val stopIntent =
+                        Intent(
+                            context,
+                            MusicNotificationService::class.java
+                        ).apply {
+                            action = MusicNotificationService.ACTION_STOP
+                        }
+                    context.startService(stopIntent)
+                    setOnErrorListener { mp, what, extra ->
+                        android.util.Log.e(
+                            "MiniPlayer",
+                            "MediaPlayer error: what=$what extra=$extra"
+                        )
+                        ListeningTracker.stopListening()
+                        false
+                    }
                 }
-                val stopIntent = Intent(context, MusicNotificationService::class.java).apply {
-                    action = MusicNotificationService.ACTION_STOP
-                }
-                context.startService(stopIntent)
-                setOnErrorListener { mp, what, extra ->
-                    android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
-                    ListeningTracker.stopListening()
-                    false
-                }
-            }
-            android.util.Log.d("MiniPlayer", "MediaPlayer initialized successfully")
+            android.util.Log.d(
+                "MiniPlayer",
+                "MediaPlayer initialized successfully"
+            )
         }
     } catch (e: Exception) {
-        android.util.Log.e("MiniPlayer", "Error initializing MediaPlayer: ${e.message}", e)
+        android.util.Log.e(
+            "MiniPlayer",
+            "Error initializing MediaPlayer: ${e.message}",
+            e
+        )
     }
 }
 
 fun playSong(song: LocalSong, context: android.content.Context) {
     try {
-        android.util.Log.d("MiniPlayer", "Attempting to play song: ${song.title}")
+        android.util.Log.d(
+            "MiniPlayer",
+            "Attempting to play song: ${song.title}"
+        )
         android.util.Log.d("MiniPlayer", "File path: ${song.filePath}")
+        android.util.Log.d("MiniPlayer", "Is downloaded: ${song.isDownloaded}")
 
         // Initialize ListeningTracker
         ListeningTracker.initialize(context)
-        
+
         // If switching songs, stop tracking the previous song
-        if (MiniPlayerState.currentSong != null && MiniPlayerState.currentSong?.id != song.id) {
+        if (MiniPlayerState.currentSong != null &&
+            MiniPlayerState.currentSong?.id != song.id
+        ) {
             ListeningTracker.switchSong(song)
         } else {
             ListeningTracker.startListening(song)
@@ -328,54 +397,106 @@ fun playSong(song: LocalSong, context: android.content.Context) {
         MiniPlayerState.mediaPlayer?.apply {
             reset()
             try {
-                // Convert the file path to a content URI
-                val contentUri = when {
-                    song.filePath.startsWith("content://") -> {
-                        // Already a content URI
-                        Uri.parse(song.filePath)
-                    }
-                    song.filePath.startsWith("/") -> {
-                        // Convert file path to URI using FileProvider
+                when {
+                    // For downloaded songs (internal storage files)
+                    song.isDownloaded && song.filePath.startsWith("/") -> {
                         val file = File(song.filePath)
-                        android.util.Log.d("MiniPlayer", "File exists: ${file.exists()}")
-                        androidx.core.content.FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.provider",
-                            file
+                        android.util.Log.d(
+                            "MiniPlayer",
+                            "Playing downloaded file: ${file.absolutePath}"
                         )
+                        android.util.Log.d(
+                            "MiniPlayer",
+                            "File exists: ${file.exists()}"
+                        )
+
+                        if (file.exists()) {
+                            // For internal storage files, use direct file path
+                            setDataSource(file.absolutePath)
+                        } else {
+                            throw Exception(
+                                "Downloaded file not found: ${file.absolutePath}"
+                            )
+                        }
+                    }
+                    // For content URIs (user-added songs)
+                    song.filePath.startsWith("content://") -> {
+                        android.util.Log.d(
+                            "MiniPlayer",
+                            "Playing content URI: ${song.filePath}"
+                        )
+                        setDataSource(context, Uri.parse(song.filePath))
+                    }
+                    // For regular file paths (user-added songs)
+                    song.filePath.startsWith("/") -> {
+                        val file = File(song.filePath)
+                        android.util.Log.d(
+                            "MiniPlayer",
+                            "Playing file path: ${file.absolutePath}"
+                        )
+
+                        if (file.exists()) {
+                            // Try direct file access first
+                            setDataSource(file.absolutePath)
+                        } else {
+                            throw Exception(
+                                "File not found: ${file.absolutePath}"
+                            )
+                        }
+                    }
+                    // For URLs (streaming)
+                    song.filePath.startsWith("http") -> {
+                        android.util.Log.d(
+                            "MiniPlayer",
+                            "Playing URL: ${song.filePath}"
+                        )
+                        setDataSource(song.filePath)
                     }
                     else -> {
-                        // Try parsing as regular URI
-                        Uri.parse(song.filePath)
+                        // Fallback: try parsing as URI
+                        android.util.Log.d(
+                            "MiniPlayer",
+                            "Trying to parse as URI: ${song.filePath}"
+                        )
+                        setDataSource(context, Uri.parse(song.filePath))
                     }
                 }
 
-                android.util.Log.d("MiniPlayer", "Using URI: $contentUri")
-                setDataSource(context, contentUri)
                 MiniPlayerState.currentSong = song
+                MiniPlayerState.currentUrl = song.filePath
                 MiniPlayerState.isPlaying = true
 
                 // Start the notification service
-                val intent = Intent(context, MusicNotificationService::class.java)
+                val intent =
+                    Intent(context, MusicNotificationService::class.java)
                 context.startForegroundService(intent)
 
                 setOnPreparedListener { mp ->
-                    android.util.Log.d("MiniPlayer", "MediaPlayer prepared successfully")
+                    android.util.Log.d(
+                        "MiniPlayer",
+                        "MediaPlayer prepared successfully"
+                    )
                     MiniPlayerState.totalDuration = mp.duration
                     mp.start()
                     MiniPlayerState.isPlaying = true
                 }
 
                 setOnErrorListener { mp, what, extra ->
-                    android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
+                    android.util.Log.e(
+                        "MiniPlayer",
+                        "MediaPlayer error: what=$what extra=$extra"
+                    )
                     ListeningTracker.stopListening()
                     false
                 }
 
                 prepareAsync()
-
             } catch (e: Exception) {
-                android.util.Log.e("MiniPlayer", "Error setting data source: ${e.message}", e)
+                android.util.Log.e(
+                    "MiniPlayer",
+                    "Error setting data source: ${e.message}",
+                    e
+                )
                 throw Exception("Could not access audio file: ${e.message}")
             }
         }
@@ -383,121 +504,191 @@ fun playSong(song: LocalSong, context: android.content.Context) {
         android.util.Log.e("MiniPlayer", "Error playing song", e)
         ListeningTracker.stopListening()
         android.widget.Toast.makeText(
-            context,
-            "Error playing song: ${e.message}",
-            android.widget.Toast.LENGTH_SHORT
-        ).show()
+                context,
+                "Error playing song: ${e.message}",
+                android.widget.Toast.LENGTH_SHORT
+            )
+            .show()
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+fun playSong(song: TopSong, context: android.content.Context) {
+    Log.d("MiniPlayer", "playSong TopSong: ${song.title}")
+    MiniPlayerState.currentSong = song
+    playSong(song.toLocalSong(), context)
+    MiniPlayerState.currentSong = song
+}
+
+fun playSong(song: CountrySong, context: android.content.Context) {
+    Log.d("MiniPlayer", "playSong CountrySong: ${song.title}")
+    MiniPlayerState.currentSong = song
+    playSong(song.toLocalSong(), context)
+    MiniPlayerState.currentSong = song
+}
+
+@Composable
+fun ShareQrDialog(
+    songId: Int,
+    title: String,
+    artist: String,
+    onDismiss: () -> Unit,
+    context: android.content.Context
+) {
+    val qrBitmap = remember(songId) {
+        generateQrCode("purrytify://song/$songId")
+    }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier =
+                Modifier.background(Color.White, RoundedCornerShape(16.dp))
+                    .padding(24.dp)
+        ) {
+            Image(
+                bitmap = qrBitmap.asImageBitmap(),
+                contentDescription = "QR Code",
+                modifier = Modifier.size(220.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(title, color = Color.Black, fontWeight = FontWeight.Bold)
+            Text(artist, color = Color.Gray, fontSize = 12.sp)
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    // Share QR as image
+                    val file = File(context.cacheDir, "qr_${songId}.png")
+                    FileOutputStream(file).use { out ->
+                        qrBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    val uri =
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.provider",
+                            file
+                        )
+                    val shareIntent =
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    context.startActivity(
+                        Intent.createChooser(shareIntent, "Share QR via")
+                    )
+                }
+            ) {
+                Text("Share QR")
+            }
+        }
+    }
+}
+
 @Composable
 fun ExpandedPlayer(
     onDismiss: () -> Unit,
     onDeleteClick: (LocalSong) -> Unit,
-    viewModel: LocalSongViewModel 
+    viewModel: LocalSongViewModel
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showOptions by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var showAudioSheet by remember { mutableStateOf(false) }
     var activeDeviceId by remember { mutableStateOf<Int?>(null) }
+    var showQrDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text(
-                    "Delete Song",
-                    color = Color.White
-                )
-            },
-            text = {
-                Text(
-                    "Are you sure you want to delete \"${MiniPlayerState.currentSong?.title}\"?",
-                    color = Color.White
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        MiniPlayerState.currentSong?.let { song ->
+        val song = MiniPlayerState.currentSong
+        if (song is LocalSong) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Delete Song", color = Color.White) },
+                text = {
+                    Text(
+                        "Are you sure you want to delete \"${song.title}\"?",
+                        color = Color.White
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
                             onDeleteClick(song)
                             MiniPlayerState.isExpanded = false
-                        }
-                        showDeleteDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Red
-                    )
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = { showDeleteDialog = false },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.DarkGray
-                    )
-                ) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = Color(0xFF282828),
-            titleContentColor = Color.White,
-            textContentColor = Color.White
-        )
+                            showDeleteDialog = false
+                        },
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = Color.Red
+                            )
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showDeleteDialog = false },
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = Color.DarkGray
+                            )
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+                containerColor = Color(0xFF282828),
+                titleContentColor = Color.White,
+                textContentColor = Color.White
+            )
+        } else {
+            showDeleteDialog = false
+        }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF282828))
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF282828))) {
         val offsetY = remember { mutableStateOf(0f) }
         val scope = rememberCoroutineScope()
         var showOptions by remember { mutableStateOf(false) }
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp)
-                .offset(y = offsetY.value.dp)
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = rememberDraggableState { delta ->
-                        val newOffset = offsetY.value + delta
-                        if (newOffset >= 0) { // Only allow dragging down
-                            offsetY.value = newOffset
-                        }
-                    },
-                    onDragStopped = { velocity ->
-                        if (offsetY.value > 300 || velocity > 300f) {
-                            onDismiss()
-                        } else {
-                            scope.launch {
-                                animate(
-                                    initialValue = offsetY.value,
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow
-                                    )
-                                ) { value, _ ->
-                                    offsetY.value = value
+            modifier =
+                Modifier.fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 32.dp)
+                    .offset(y = offsetY.value.dp)
+                    .draggable(
+                        orientation = Orientation.Vertical,
+                        state =
+                            rememberDraggableState { delta ->
+                                val newOffset = offsetY.value + delta
+                                if (newOffset >= 0) { // Only allow dragging down
+                                    offsetY.value = newOffset
+                                }
+                            },
+                        onDragStopped = { velocity ->
+                            if (offsetY.value > 300 || velocity > 300f) {
+                                onDismiss()
+                            } else {
+                                scope.launch {
+                                    animate(
+                                        initialValue = offsetY.value,
+                                        targetValue = 0f,
+                                        animationSpec =
+                                            spring(
+                                                dampingRatio =
+                                                    Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessLow
+                                            )
+                                    ) { value, _ ->
+                                        offsetY.value = value
+                                    }
                                 }
                             }
                         }
-                    }
-                )
+                    )
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                modifier =
+                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -506,7 +697,8 @@ fun ExpandedPlayer(
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_arrow_down),
+                        painter =
+                            painterResource(id = R.drawable.ic_arrow_down),
                         contentDescription = "Close",
                         tint = Color.White,
                         modifier = Modifier.size(32.dp)
@@ -514,83 +706,115 @@ fun ExpandedPlayer(
                 }
 
                 Box {
-                    IconButton(onClick = { showOptions = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "More Options",
-                            tint = Color.Gray
-                        )
-                    }
+                    if (MiniPlayerState.currentSong is LocalSong) {
+                        IconButton(onClick = { showOptions = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "More Options",
+                                tint = Color.Gray
+                            )
+                        }
 
-                    DropdownMenu(
-                        expanded = showOptions,
-                        onDismissRequest = { showOptions = false },
-                        modifier = Modifier.background(Color(0xFF282828))
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit", color = Color.White) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = Color.White
-                                )
-                            },
-                            onClick = {
-                                showOptions = false
-                            }
-                        )
+                        DropdownMenu(
+                            expanded = showOptions,
+                            onDismissRequest = { showOptions = false },
+                            modifier = Modifier.background(Color(0xFF282828))
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit", color = Color.White) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        tint = Color.White
+                                    )
+                                },
+                                onClick = { showOptions = false }
+                            )
 
-                        DropdownMenuItem(
-                            text = { Text("Delete", color = Color.Red) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    tint = Color.Red
-                                )
-                            },
-                            onClick = {
-                                showOptions = false
-                                showDeleteDialog = true
-                            }
-                        )
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = Color.Red) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.Red
+                                    )
+                                },
+                                onClick = {
+                                    showOptions = false
+                                    showDeleteDialog = true
+                                }
+                            )
+                        }
                     }
                 }
             }
 
             MiniPlayerState.currentSong?.let { song ->
+                val title =
+                    when (song) {
+                        is LocalSong -> song.title
+                        is TopSong -> song.title
+                        is CountrySong -> song.title
+                        else -> ""
+                    }
+                val artist =
+                    when (song) {
+                        is LocalSong -> song.artist
+                        is TopSong -> song.artist
+                        is CountrySong -> song.artist
+                        else -> ""
+                    }
+                val artworkPath =
+                    when (song) {
+                        is LocalSong -> song.artworkPath
+                        is TopSong -> song.artwork
+                        is CountrySong -> song.artwork
+                        else -> null
+                    }
+                val isLiked = (song as? LocalSong)?.isLiked == true
+
                 // Album artwork
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center)
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .wrapContentSize(Alignment.Center)
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(320.dp)
-                            .background(Color.DarkGray, RoundedCornerShape(8.dp)),
+                        modifier =
+                            Modifier.size(320.dp)
+                                .background(
+                                    Color.DarkGray,
+                                    RoundedCornerShape(8.dp)
+                                ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (song.artworkPath != null) {
+                        if (artworkPath != null) {
                             AndroidView(
                                 factory = { ctx ->
                                     ImageView(ctx).apply {
-                                        scaleType = ImageView.ScaleType.CENTER_CROP
+                                        scaleType =
+                                            ImageView.ScaleType.CENTER_CROP
                                     }
                                 },
                                 update = { imageView ->
                                     Glide.with(imageView)
-                                        .load(Uri.parse(song.artworkPath))
+                                        .load(Uri.parse(artworkPath))
                                         .centerCrop()
-                                        .placeholder(R.drawable.placeholder_album)
+                                        .placeholder(
+                                            R.drawable.placeholder_album
+                                        )
                                         .into(imageView)
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
                             Icon(
-                                painter = painterResource(id = R.drawable.play_circle),
+                                painter =
+                                    painterResource(
+                                        id = R.drawable.play_circle
+                                    ),
                                 contentDescription = "Music Icon",
                                 tint = Color.White,
                                 modifier = Modifier.size(100.dp)
@@ -612,47 +836,54 @@ fun ExpandedPlayer(
                         horizontalAlignment = Alignment.Start
                     ) {
                         Text(
-                            text = song.title,
-                            style = TextStyle(
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = LocalPoppinsFont.current,
-                                color = Color.White
-                            ),
+                            text = title,
+                            style =
+                                TextStyle(
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = LocalPoppinsFont.current,
+                                    color = Color.White
+                                ),
                             textAlign = TextAlign.Start
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = song.artist,
-                            style = TextStyle(
-                                fontSize = 20.sp,
-                                fontFamily = LocalPoppinsFont.current,
-                                color = Color.Gray
-                            ),
+                            text = artist,
+                            style =
+                                TextStyle(
+                                    fontSize = 20.sp,
+                                    fontFamily = LocalPoppinsFont.current,
+                                    color = Color.Gray
+                                ),
                             textAlign = TextAlign.Start
                         )
                     }
 
                     // Like button
-                    IconButton(
-                        onClick = { 
-                            MiniPlayerState.currentSong?.let { song ->
-                                viewModel.toggleLikeStatus(song)
-                            }
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        val isLiked = MiniPlayerState.currentSong?.isLiked == true
-                        Icon(
-                            painter = painterResource(
-                                id = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
-                            ),
-                            contentDescription = if (isLiked) "Unlike" else "Like",
-                            tint = if (isLiked) Color(0xFF1DB954) else Color.Gray,
-                            modifier = Modifier.size(32.dp)
-                        )
+                    if (song is LocalSong) {
+                        IconButton(
+                            onClick = { viewModel.toggleLikeStatus(song) },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            val isLiked = song.isLiked
+                            Icon(
+                                painter =
+                                    painterResource(
+                                        id =
+                                            if (isLiked)
+                                                R.drawable.ic_heart_filled
+                                            else R.drawable.ic_heart_outline
+                                    ),
+                                contentDescription =
+                                    if (isLiked) "Unlike" else "Like",
+                                tint =
+                                    if (isLiked) Color(0xFF1DB954)
+                                    else Color.Gray,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
 
@@ -665,86 +896,93 @@ fun ExpandedPlayer(
                 ) {
                     var isDragging by remember { mutableStateOf(false) }
                     var dragPosition by remember { mutableStateOf(0f) }
-                    
+
                     // Progress bar
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(24.dp)
-                            .padding(vertical = 10.dp)
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .height(24.dp)
+                                .padding(vertical = 10.dp)
                     ) {
                         // Background track
                         LinearProgressIndicator(
                             progress = 1f,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp),
+                            modifier =
+                                Modifier.fillMaxWidth().height(4.dp),
                             color = Color.DarkGray,
                         )
 
                         // Progress track
                         LinearProgressIndicator(
-                            progress = if (isDragging) 
-                                dragPosition 
-                            else if (MiniPlayerState.totalDuration > 0)
-                                MiniPlayerState.currentPosition.toFloat() / MiniPlayerState.totalDuration
-                            else 0f,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .pointerInput(Unit) {
-                                    detectHorizontalDragGestures(
-                                        onDragStart = { 
-                                            isDragging = true 
-                                        },
-                                        onDragEnd = {
-                                            isDragging = false
-                                            seekToPosition(dragPosition)
-                                        },
-                                        onDragCancel = { 
-                                            isDragging = false 
-                                        },
-                                        onHorizontalDrag = { change, dragAmount ->
-                                            change.consume()
-                                            val newPosition = dragPosition + (dragAmount / size.width)
-                                            dragPosition = newPosition.coerceIn(0f, 1f)
-                                        }
-                                    )
-                                }
-                                .pointerInput(Unit) {
-                                    detectTapGestures { offset ->
-                                        val position = offset.x / size.width
-                                        seekToPosition(position)
+                            progress =
+                                if (isDragging) dragPosition
+                                else if (MiniPlayerState.totalDuration > 0)
+                                    MiniPlayerState.currentPosition.toFloat() /
+                                        MiniPlayerState.totalDuration
+                                else 0f,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .height(4.dp)
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures(
+                                            onDragStart = {
+                                                isDragging = true
+                                            },
+                                            onDragEnd = {
+                                                isDragging = false
+                                                seekToPosition(dragPosition)
+                                            },
+                                            onDragCancel = {
+                                                isDragging = false
+                                            },
+                                            onHorizontalDrag = {
+                                                change,
+                                                dragAmount ->
+                                                change.consume()
+                                                val newPosition =
+                                                    dragPosition +
+                                                        (dragAmount / size.width)
+                                                dragPosition =
+                                                    newPosition.coerceIn(0f, 1f)
+                                            }
+                                        )
                                     }
-                                },
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val position = offset.x / size.width
+                                            seekToPosition(position)
+                                        }
+                                    },
                             color = Color(0xFF1DB954)
                         )
                     }
 
                     // Time stamps
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
+                        modifier =
+                            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = formatTimeMs(
-                                if (isDragging) 
-                                    (dragPosition * MiniPlayerState.totalDuration).toInt()
-                                else 
-                                    MiniPlayerState.currentPosition
-                            ),
+                            text =
+                                formatTimeMs(
+                                    if (isDragging)
+                                        (dragPosition *
+                                                MiniPlayerState.totalDuration)
+                                            .toInt()
+                                    else MiniPlayerState.currentPosition
+                                ),
                             color = Color.Gray,
                             fontSize = 14.sp
                         )
                         Text(
-                            text = formatTimeMs(MiniPlayerState.totalDuration),
+                            text =
+                                formatTimeMs(MiniPlayerState.totalDuration),
                             color = Color.Gray,
                             fontSize = 14.sp
                         )
                     }
-                        Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     // Playback controls
                     Row(
@@ -776,11 +1014,15 @@ fun ExpandedPlayer(
                         }
 
                         val devices = getAvailableOutputDevices(context)
-                        val activeDevice = devices.find { it.id == activeDeviceId }
+                        val activeDevice =
+                            devices.find { it.id == activeDeviceId }
 
                         IconButton(onClick = { /* Previous song */ }) {
                             Icon(
-                                painter = painterResource(id = R.drawable.skip_previous),
+                                painter =
+                                    painterResource(
+                                        id = R.drawable.skip_previous
+                                    ),
                                 contentDescription = "Previous",
                                 tint = Color.White,
                                 modifier = Modifier.size(36.dp)
@@ -804,14 +1046,16 @@ fun ExpandedPlayer(
                             modifier = Modifier.size(72.dp)
                         ) {
                             Icon(
-                                painter = painterResource(
-                                    id = if (MiniPlayerState.isPlaying) 
-                                        R.drawable.pause 
-                                    else R.drawable.play_circle
-                                ),
-                                contentDescription = if (MiniPlayerState.isPlaying) 
-                                    "Pause" 
-                                else "Play",
+                                painter =
+                                    painterResource(
+                                        id =
+                                            if (MiniPlayerState.isPlaying)
+                                                R.drawable.pause
+                                            else R.drawable.play_circle
+                                    ),
+                                contentDescription =
+                                    if (MiniPlayerState.isPlaying) "Pause"
+                                    else "Play",
                                 tint = Color(0xFF1DB954),
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -819,27 +1063,83 @@ fun ExpandedPlayer(
 
                         IconButton(onClick = { /* Next song */ }) {
                             Icon(
-                                painter = painterResource(id = R.drawable.skip_next),
+                                painter =
+                                    painterResource(id = R.drawable.skip_next),
                                 contentDescription = "Next",
                                 tint = Color.White,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
 
-                        IconButton(
-                            onClick = { /* share song */ }
+                        if (MiniPlayerState.currentSong is TopSong ||
+                            MiniPlayerState.currentSong is CountrySong
                         ) {
-                            Icon(
-                                Icons.Default.Share,
-                                contentDescription = "share song",
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
-                            )
+                            val onlineSong = MiniPlayerState.currentSong
+                            val songId =
+                                when (onlineSong) {
+                                    is TopSong -> onlineSong.id
+                                    is CountrySong -> onlineSong.id
+                                    else -> return
+                                }
+                            IconButton(
+                                onClick = { shareSong(context, songId) }
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "share song",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        // QR BUTTON
+                        if (MiniPlayerState.currentSong is TopSong ||
+                            MiniPlayerState.currentSong is CountrySong
+                        ) {
+                            val onlineSong = MiniPlayerState.currentSong
+                            val songId =
+                                when (onlineSong) {
+                                    is TopSong -> onlineSong.id
+                                    is CountrySong -> onlineSong.id
+                                    else -> return
+                                }
+                            IconButton(onClick = { showQrDialog = true }) {
+                                Icon(
+                                    Icons.Default.QrCode,
+                                    contentDescription = "Share QR"
+                                )
+                            }
+                            if (showQrDialog) {
+                                when (onlineSong) {
+                                    is TopSong ->
+                                        ShareQrDialog(
+                                            songId = onlineSong.id,
+                                            title = onlineSong.title,
+                                            artist = onlineSong.artist,
+                                            onDismiss = {
+                                                showQrDialog = false
+                                            },
+                                            context = context
+                                        )
+                                    is CountrySong ->
+                                        ShareQrDialog(
+                                            songId = onlineSong.id,
+                                            title = onlineSong.title,
+                                            artist = onlineSong.artist,
+                                            onDismiss = {
+                                                showQrDialog = false
+                                            },
+                                            context = context
+                                        )
+                                }
+                            }
                         }
                     }
 
                     val devices = getAvailableOutputDevices(context)
-                    val activeDevice = devices.find { it.id == activeDeviceId }
+                    val activeDevice =
+                        devices.find { it.id == activeDeviceId }
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -847,10 +1147,15 @@ fun ExpandedPlayer(
                     ) {
                         if (activeDevice != null) {
                             Text(
-                                text = "output device: ${activeDevice.name}",
+                                text =
+                                    "output device: ${activeDevice.name}",
                                 color = Color(0xFF1DB954),
                                 fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                                modifier =
+                                    Modifier.padding(
+                                        top = 4.dp,
+                                        start = 4.dp
+                                    ),
                                 textAlign = TextAlign.Start,
                             )
                         }

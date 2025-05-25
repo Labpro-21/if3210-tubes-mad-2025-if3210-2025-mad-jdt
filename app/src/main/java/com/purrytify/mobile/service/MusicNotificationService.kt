@@ -12,6 +12,8 @@ import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.room.LocalSong
+import com.purrytify.mobile.data.room.TopSong
+import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.utils.ListeningTracker
 
@@ -99,7 +101,14 @@ class MusicNotificationService : Service() {
             PendingIntent.getActivity(this, 4, it, PendingIntent.FLAG_IMMUTABLE)
         }
 
-        val largeIcon = song?.artworkPath?.let {
+        val (title, artist, artworkPath) = when (song) {
+            is LocalSong -> Triple(song.title, song.artist, song.artworkPath)
+            is TopSong -> Triple(song.title, song.artist, song.artwork)
+            is CountrySong -> Triple(song.title, song.artist, song.artwork)
+            else -> Triple("No Song", "Unknown Artist", null)
+        }
+
+        val largeIcon = artworkPath?.let {
             try {
                 BitmapFactory.decodeFile(it)
             } catch (e: Exception) {
@@ -115,8 +124,8 @@ class MusicNotificationService : Service() {
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(song?.title ?: "No Song")
-            .setContentText(song?.artist ?: "Unknown Artist")
+            .setContentTitle(title)
+            .setContentText(artist)
             .setSmallIcon(R.drawable.splash_logo)
             .setLargeIcon(largeIcon)
             .setContentIntent(openPlayerIntent)

@@ -36,6 +36,10 @@ class LocalSongViewModel(application: Application) : AndroidViewModel(applicatio
     
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _downloadedSongs = MutableStateFlow<List<LocalSong>>(emptyList())
+    val downloadedSongs: StateFlow<List<LocalSong>> = _downloadedSongs.asStateFlow()
+
     
     init {
         val localSongDao = AppDatabase.getDatabase(application).localSongDao()
@@ -50,6 +54,12 @@ class LocalSongViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             repository.likedSongs.collectLatest { songs ->
                 _likedSongs.value = songs
+            }
+        }
+
+        viewModelScope.launch {
+            repository.downloadedSongs.collectLatest { songs ->  // Use property, not method
+                _downloadedSongs.value = songs
             }
         }
     }
@@ -88,7 +98,8 @@ class LocalSongViewModel(application: Application) : AndroidViewModel(applicatio
                     duration = duration,
                     filePath = realPath ?: audioFileUri.toString(), // Use real path if available
                     artworkPath = coverImageUri?.toString(),
-                    isLiked = false
+                    isLiked = false,
+                    isDownloaded = false, // Default to false, can be updated later
                 )
                 
                 repository.insert(localSong)
@@ -163,8 +174,8 @@ private fun getRealPathFromUri(uri: Uri): String? {
                 val updatedSong = song.copy(isLiked = !song.isLiked)
                 // Update in database
                 repository.update(updatedSong)
-                // Update MiniPlayerState if it's the current song
-                if (MiniPlayerState.currentSong?.id == song.id) {
+                val current = MiniPlayerState.currentSong
+                if (current is LocalSong && current.id == song.id) {
                     MiniPlayerState.currentSong = updatedSong
                 }
             } catch (e: Exception) {
