@@ -71,6 +71,8 @@ class MusicNotificationService : Service() {
         Log.d("MusicNotificationService", "showNotification called")
         val song = MiniPlayerState.currentSong
         val isPlaying = MiniPlayerState.isPlaying
+        val durationMs = MiniPlayerState.totalDuration
+        val currentPositionMs = MiniPlayerState.mediaPlayer?.currentPosition ?: 0
 
         val playPauseIcon = if (isPlaying) R.drawable.pause else R.drawable.play_circle
         val playPauseLabel = if (isPlaying) "Pause" else "Play"
@@ -88,7 +90,6 @@ class MusicNotificationService : Service() {
             this, 3, Intent(this, javaClass).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Intent untuk membuka player saat notifikasi diklik
         val openPlayerIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(this, 4, it, PendingIntent.FLAG_IMMUTABLE)
         }
@@ -101,6 +102,13 @@ class MusicNotificationService : Service() {
             }
         } ?: BitmapFactory.decodeResource(resources, R.drawable.placeholder_album)
 
+        fun formatTime(ms: Int): String {
+            val totalSec = ms / 1000
+            val min = totalSec / 60
+            val sec = totalSec % 60
+            return "%d:%02d".format(min, sec)
+        }
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(song?.title ?: "No Song")
             .setContentText(song?.artist ?: "Unknown Artist")
@@ -110,15 +118,18 @@ class MusicNotificationService : Service() {
             .addAction(R.drawable.skip_previous, "Prev", prevIntent)
             .addAction(playPauseIcon, playPauseLabel, playPauseIntent)
             .addAction(R.drawable.skip_next, "Next", nextIntent)
+            .addAction(R.drawable.ic_close, "Stop", stopIntent)
             .setDeleteIntent(stopIntent)
             .setStyle(
                 MediaStyle()
-                    .setShowActionsInCompactView(0, 1, 2)
+                    .setShowActionsInCompactView(0, 1, 2, 3)
             )
+            .setSubText("${formatTime(currentPositionMs)} / ${formatTime(durationMs)}")
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
+            .setColor(0xFF181818.toInt())
 
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(

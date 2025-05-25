@@ -10,7 +10,10 @@ object ApiClient {
     private const val BASE_URL = "http://34.101.226.132:3000"
     private var authInterceptor: AuthInterceptor? = null
 
-    fun buildRetrofit(tokenManager: TokenManager? = null, onLogoutRequired: (() -> Unit)? = null): Retrofit {
+    fun buildRetrofit(
+        tokenManager: TokenManager? = null,
+        onLogoutRequired: (() -> Unit)? = null
+    ): Retrofit {
         val httpClientBuilder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -18,8 +21,6 @@ object ApiClient {
 
         // Add auth interceptor if tokenManager is provided
         if (tokenManager != null) {
-            // If logout callback is provided, create a new interceptor instance
-            // Otherwise, use cached interceptor for backward compatibility
             val interceptor = if (onLogoutRequired != null) {
                 // Create a basic Retrofit instance first to get AuthService
                 val basicRetrofit = Retrofit.Builder()
@@ -60,5 +61,13 @@ object ApiClient {
 
     fun createUserService(retrofit: Retrofit): UserService {
         return retrofit.create(UserService::class.java)
+    }
+
+    fun createSongService(retrofit: Retrofit): SongService {
+        return retrofit.create(SongService::class.java)
+    }
+
+    fun createCountrySongService(retrofit: Retrofit): CountrySongService {
+        return retrofit.create(CountrySongService::class.java)
     }
 }

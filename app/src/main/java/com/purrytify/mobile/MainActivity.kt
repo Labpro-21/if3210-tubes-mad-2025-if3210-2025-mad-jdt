@@ -41,10 +41,15 @@ import androidx.navigation.compose.rememberNavController
 import com.purrytify.mobile.api.ApiClient
 import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.data.TokenManager
+import com.purrytify.mobile.data.createCountrySongRepository // Added
+import com.purrytify.mobile.data.createSongRepository // Added
+import com.purrytify.mobile.data.room.LocalSong // Added
 import com.purrytify.mobile.ui.BottomNavItem
 import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.MiniPlayer
 import com.purrytify.mobile.ui.initializeMediaPlayer
+import com.purrytify.mobile.ui.screens.CountrySong
+import com.purrytify.mobile.ui.screens.GlobalSong
 import com.purrytify.mobile.ui.screens.HomeScreen
 import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
@@ -87,32 +92,45 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                requestPermissionLauncher.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
             }
         }
 
         // --- Dependencies ---
         val tokenManager = TokenManager(applicationContext)
-        
+
         // Create logout callback that restarts MainActivity with logout flag
         val onLogoutRequired = {
-            Log.d("MainActivity", "Logout required from interceptor, restarting activity")
+            Log.d(
+                "MainActivity",
+                "Logout required from interceptor, restarting activity"
+            )
             val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                flags =
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra("isLogout", true)
             }
             startActivity(intent)
             finish()
         }
-        
-        val retrofit = ApiClient.buildRetrofit(tokenManager, onLogoutRequired)  // Pass tokenManager and logout callback
+
+        val retrofit = ApiClient.buildRetrofit(
+            tokenManager,
+            onLogoutRequired
+        ) // Pass tokenManager and logout callback
         val authService = ApiClient.createAuthService(retrofit)
         val userService = ApiClient.createUserService(retrofit)
-        val authRepository = AuthRepository(tokenManager, authService, userService)
-        val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext)
+        val authRepository =
+            AuthRepository(tokenManager, authService, userService)
+        val networkConnectivityObserver =
+            NetworkConnectivityObserver(applicationContext)
         // --- End Dependencies ---
 
         setContent {
@@ -120,19 +138,20 @@ class MainActivity : ComponentActivity() {
             PurrytifyTheme {
                 val poppinsFontFamily: FontFamily = rememberPoppinsFontFamily()
                 CompositionLocalProvider(LocalPoppinsFont provides poppinsFontFamily) {
-
                     val navController = rememberNavController()
 
                     val startDestination = remember {
                         if (checkInitialAuthState(tokenManager)) "main" else "auth"
                     }
-                    Log.d("MainActivity", "Initial start destination: $startDestination")
+                    Log.d(
+                        "MainActivity",
+                        "Initial start destination: $startDestination"
+                    )
 
                     NavHost(
                         navController = navController,
                         startDestination = startDestination
                     ) {
-
                         // Authentication Flow Graph
                         navigation(startDestination = "splash", route = "auth") {
                             composable("splash") {
@@ -143,7 +162,10 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             composable("login") {
-                                Log.d("MainActivity", "Navigating to LoginScreen")
+                                Log.d(
+                                    "MainActivity",
+                                    "Navigating to LoginScreen"
+                                )
                                 LoginScreen(
                                     authRepository = authRepository,
                                     navController = navController
@@ -153,11 +175,15 @@ class MainActivity : ComponentActivity() {
 
                         // Main Application Flow Graph
                         composable("main") {
-                            Log.d("MainActivity", "Navigating to MainContent (main graph)")
+                            Log.d(
+                                "MainActivity",
+                                "Navigating to MainContent (main graph)"
+                            )
                             MainContent(
                                 navController = navController,
                                 authRepository = authRepository,
-                                networkConnectivityObserver = networkConnectivityObserver // Add this parameter
+                                networkConnectivityObserver = networkConnectivityObserver,
+                                tokenManager = tokenManager // Pass tokenManager
                             )
                         }
                     }
@@ -169,7 +195,8 @@ class MainActivity : ComponentActivity() {
 
     // Simple synchronous check using the blocking getAccessToken
     private fun checkInitialAuthState(tokenManager: TokenManager): Boolean {
-        val hasToken = tokenManager.getAccessToken() != null // Use the blocking version here
+        val hasToken =
+            tokenManager.getAccessToken() != null // Use the blocking version here
         Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
         return hasToken
     }
@@ -185,13 +212,41 @@ class MainActivity : ComponentActivity() {
 
         return remember {
             FontFamily(
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Light),
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Normal),
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Medium),
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.SemiBold),
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Bold),
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.ExtraBold),
-                Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Black)
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Light
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Normal
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Medium
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.SemiBold
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Bold
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.ExtraBold
+                ),
+                Font(
+                    googleFont = fontName,
+                    fontProvider = provider,
+                    weight = FontWeight.Black
+                )
             )
         }
     }
@@ -202,7 +257,8 @@ class MainActivity : ComponentActivity() {
 fun MainContent(
     navController: NavHostController, // Top-level controller for logout
     authRepository: AuthRepository, // Pass the repository instance
-    networkConnectivityObserver: NetworkConnectivityObserver
+    networkConnectivityObserver: NetworkConnectivityObserver,
+    tokenManager: TokenManager // Added tokenManager parameter
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
     val scope =
@@ -214,9 +270,7 @@ fun MainContent(
     val localSongViewModel: LocalSongViewModel = viewModel()
 
     // Initialize MediaPlayer
-    LaunchedEffect(Unit) {
-        initializeMediaPlayer(context)
-    }
+    LaunchedEffect(Unit) { initializeMediaPlayer(context) }
 
     // Show network status changes
     LaunchedEffect(networkStatus) {
@@ -260,7 +314,9 @@ fun MainContent(
                 startDestination = BottomNavItem.Home.route,
                 modifier = Modifier.padding(innerPadding)
             ) {
-                composable(BottomNavItem.Home.route) { HomeScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Home.route) {
+                    HomeScreen(navController = nestedNavController)
+                }
                 composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
@@ -275,6 +331,24 @@ fun MainContent(
                                 }
                             }
                         }
+                    )
+                }
+                composable("global_song") {
+                    val songRepository = remember {
+                        createSongRepository(tokenManager) // Use passed tokenManager
+                    }
+                    GlobalSong(
+                        navController = nestedNavController,
+                        repository = songRepository
+                    )
+                }
+                composable("country_song") {
+                    val countrySongRepository = remember {
+                        createCountrySongRepository(tokenManager) // Use passed tokenManager
+                    }
+                    CountrySong(
+                        navController = nestedNavController,
+                        repository = countrySongRepository
                     )
                 }
             }
