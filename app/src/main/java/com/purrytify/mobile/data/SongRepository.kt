@@ -1,5 +1,6 @@
 package com.purrytify.mobile.data
 
+import android.util.Log
 import com.purrytify.mobile.api.ApiClient
 import com.purrytify.mobile.api.SongService
 import com.purrytify.mobile.data.room.TopSong
@@ -25,7 +26,9 @@ class SongRepository(private val songService: SongService) {
     }
 
     suspend fun getSongById(songId: Int): TopSong? {
+        Log.d("MiniPlayer", "getSongById called with id=$songId")
         val response = songService.getTopSongs(songId)
+        Log.d("MiniPlayer", "getSongById result: $response")
         return if (response.isSuccessful) response.body() else null
     }
 }

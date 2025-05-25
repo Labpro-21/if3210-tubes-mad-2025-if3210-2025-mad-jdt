@@ -59,6 +59,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Share
 import android.content.Intent
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.QrCode
@@ -400,13 +401,17 @@ fun playSong(song: LocalSong, context: android.content.Context) {
 }
 
 fun playSong(song: TopSong, context: android.content.Context) {
-    playSong(song.toLocalSong(), context)
+    Log.d("MiniPlayer", "playSong TopSong: ${song.title}")
     MiniPlayerState.currentSong = song
+    playSong(song.toLocalSong(), context)
+     MiniPlayerState.currentSong = song
 }
 
 fun playSong(song: CountrySong, context: android.content.Context) {
-    playSong(song.toLocalSong(), context)
+    Log.d("MiniPlayer", "playSong CountrySong: ${song.title}")
     MiniPlayerState.currentSong = song
+    playSong(song.toLocalSong(), context)
+     MiniPlayerState.currentSong = song
 }
 
 @Composable
@@ -934,40 +939,31 @@ fun ExpandedPlayer(
 
                         // QR BUTTON
                         if (MiniPlayerState.currentSong is TopSong || MiniPlayerState.currentSong is CountrySong) {
-                            IconButton(onClick = { showQrDialog = true }) {
-                                Icon(
-                                    Icons.Default.QrCode,
-                                    contentDescription = "Share QR",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(36.dp)
-                                )
+                            val onlineSong = MiniPlayerState.currentSong
+                            val songId = when (onlineSong) {
+                                is TopSong -> onlineSong.id
+                                is CountrySong -> onlineSong.id
+                                else -> return
                             }
-                        }
-
-                        if (showQrDialog) {
-                            val song = MiniPlayerState.currentSong
-                            when (song) {
-                                is TopSong -> {
-                                    ShareQrDialog(
-                                        songId = song.id,
-                                        title = song.title,
-                                        artist = song.artist,
+                            IconButton(onClick = { showQrDialog = true }) {
+                                Icon(Icons.Default.QrCode, contentDescription = "Share QR")
+                            }
+                            if (showQrDialog) {
+                                when (onlineSong) {
+                                    is TopSong -> ShareQrDialog(
+                                        songId = onlineSong.id,
+                                        title = onlineSong.title,
+                                        artist = onlineSong.artist,
                                         onDismiss = { showQrDialog = false },
                                         context = context
                                     )
-                                }
-                                is CountrySong -> {
-                                    ShareQrDialog(
-                                        songId = song.id,
-                                        title = song.title,
-                                        artist = song.artist,
+                                    is CountrySong -> ShareQrDialog(
+                                        songId = onlineSong.id,
+                                        title = onlineSong.title,
+                                        artist = onlineSong.artist,
                                         onDismiss = { showQrDialog = false },
                                         context = context
                                     )
-                                }
-                                else -> {
-                                    // Jika bukan online song, jangan tampilkan dialog
-                                    showQrDialog = false
                                 }
                             }
                         }
