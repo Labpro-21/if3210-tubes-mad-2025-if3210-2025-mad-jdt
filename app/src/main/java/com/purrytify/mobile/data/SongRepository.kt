@@ -19,7 +19,6 @@ class SongRepository(
     private val localSongDao: LocalSongDao? = null,
     private val context: Context? = null
 ) {
-
     suspend fun getTopSongs(): Result<List<TopSong>> = withContext(Dispatchers.IO) {
         try {
             val response = songService.getTopSongs()
@@ -43,7 +42,7 @@ class SongRepository(
         if (context == null || localSongDao == null) {
             throw Exception("Context or LocalSongDao not available")
         }
-        
+
         withContext(Dispatchers.IO) {
             try {
                 // Check if song is already downloaded
@@ -54,7 +53,7 @@ class SongRepository(
                     }
                     return@withContext
                 }
-                
+
                 val response = songService.downloadFile(song.url)
                 val body = response.body()
 
@@ -64,7 +63,7 @@ class SongRepository(
                     if (!downloadsDir.exists()) {
                         downloadsDir.mkdirs()
                     }
-                    
+
                     val fileName = "${song.id}.mp3"
                     val file = File(downloadsDir, fileName)
 
@@ -91,7 +90,7 @@ class SongRepository(
 
                     val downloadedSong = song.toLocalSong(downloadedFilePath = file.absolutePath)
                     localSongDao.insert(downloadedSong)
-                    
+
                     withContext(Dispatchers.Main) {
                         onComplete(downloadedSong)
                     }
@@ -103,6 +102,7 @@ class SongRepository(
                 throw e
             }
         }
+    }
         
     suspend fun getSongById(songId: Int): TopSong? {
         Log.d("MiniPlayer", "getSongById called with id=$songId")
