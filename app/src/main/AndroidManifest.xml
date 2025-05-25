@@ -61,6 +61,7 @@
             android:exported="false" />
         <service
             android:name=".service.MusicNotificationService"
+            android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <provider
