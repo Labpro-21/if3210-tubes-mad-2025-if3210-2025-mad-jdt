@@ -1,11 +1,17 @@
 package com.purrytify.mobile
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -25,7 +31,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.lifecycle.lifecycleScope
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,6 +43,8 @@ import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.data.TokenManager
 import com.purrytify.mobile.ui.BottomNavItem
 import com.purrytify.mobile.ui.BottomNavigationBar
+import com.purrytify.mobile.ui.MiniPlayer
+import com.purrytify.mobile.ui.initializeMediaPlayer
 import com.purrytify.mobile.ui.screens.HomeScreen
 import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
@@ -43,21 +52,9 @@ import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
+import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.purrytify.mobile.ui.MiniPlayer
-import com.purrytify.mobile.ui.initializeMediaPlayer
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import android.Manifest
-import android.os.Build
-import android.content.pm.PackageManager
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import com.purrytify.mobile.data.room.LocalSong
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.purrytify.mobile.viewmodel.LocalSongViewModel
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -99,9 +96,22 @@ class MainActivity : ComponentActivity() {
 
         // --- Dependencies ---
         val tokenManager = TokenManager(applicationContext)
-        val retrofit = ApiClient.buildRetrofit(tokenManager)  // Pass tokenManager here
+        
+        // Create logout callback that restarts MainActivity with logout flag
+        val onLogoutRequired = {
+            Log.d("MainActivity", "Logout required from interceptor, restarting activity")
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("isLogout", true)
+            }
+            startActivity(intent)
+            finish()
+        }
+        
+        val retrofit = ApiClient.buildRetrofit(tokenManager, onLogoutRequired)  // Pass tokenManager and logout callback
         val authService = ApiClient.createAuthService(retrofit)
-        val authRepository = AuthRepository(tokenManager, authService)
+        val userService = ApiClient.createUserService(retrofit)
+        val authRepository = AuthRepository(tokenManager, authService, userService)
         val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext)
         // --- End Dependencies ---
 
@@ -146,7 +156,6 @@ class MainActivity : ComponentActivity() {
                             Log.d("MainActivity", "Navigating to MainContent (main graph)")
                             MainContent(
                                 navController = navController,
-                                tokenManager = tokenManager,
                                 authRepository = authRepository,
                                 networkConnectivityObserver = networkConnectivityObserver // Add this parameter
                             )
@@ -167,7 +176,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun rememberPoppinsFontFamily(): FontFamily {
-        val context = LocalContext.current
         val provider = GoogleFont.Provider(
             providerAuthority = "com.google.android.gms.fonts",
             providerPackage = "com.google.android.gms",
@@ -193,22 +201,23 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainContent(
     navController: NavHostController, // Top-level controller for logout
-    tokenManager: TokenManager, // Pass needed dependencies
     authRepository: AuthRepository, // Pass the repository instance
     networkConnectivityObserver: NetworkConnectivityObserver
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
-    val scope = rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+    val scope =
+        rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val networkStatus = networkConnectivityObserver.observe().collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
+    val networkStatus = networkConnectivityObserver.observe()
+        .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
     val localSongViewModel: LocalSongViewModel = viewModel()
 
     // Initialize MediaPlayer
     LaunchedEffect(Unit) {
         initializeMediaPlayer(context)
     }
-    
+
     // Show network status changes
     LaunchedEffect(networkStatus) {
         when (networkStatus) {
@@ -216,6 +225,7 @@ fun MainContent(
             NetworkConnectivityObserver.Status.LOST -> {
                 snackbarHostState.showSnackbar("No network connection")
             }
+
             NetworkConnectivityObserver.Status.AVAILABLE -> {
                 if (snackbarHostState.currentSnackbarData != null) {
                     snackbarHostState.currentSnackbarData?.dismiss()
@@ -223,10 +233,11 @@ fun MainContent(
                     snackbarHostState.showSnackbar("Network connection restored")
                 }
             }
+
             else -> {} // Do nothing for LOSING state
         }
     }
-    
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -235,7 +246,7 @@ fun MainContent(
             bottomBar = {
                 Column {
                     MiniPlayer(
-                        onDeleteClick = { song -> 
+                        onDeleteClick = { song ->
                             localSongViewModel.deleteSong(song)
                         },
                         viewModel = localSongViewModel,

@@ -34,11 +34,12 @@ class TokenExpirationService : Service() {
 
         // Create AuthService
         val authService = ApiClient.createAuthService(retrofit)
+        val userService = ApiClient.createUserService(retrofit)
 
         // Create TokenManager, needs context
         tokenManager = TokenManager(this)
 
-        authRepository = AuthRepository(tokenManager, authService)
+        authRepository = AuthRepository(tokenManager, authService, userService)
 
         startTokenCheck()
         return START_STICKY
