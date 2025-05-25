@@ -1,5 +1,6 @@
 package com.purrytify.mobile.ui
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.media.MediaPlayer
@@ -88,6 +89,82 @@ object MiniPlayerState {
     var totalDuration by mutableStateOf(0)
     var isExpanded by mutableStateOf(false)
     var currentUrl: String? by mutableStateOf(null)
+    var fromNotification: Boolean = false
+    var isUserSeeking: Boolean = false
+    var currentQueue: List<Any> = emptyList()
+    var currentIndex: Int = -1
+    var queueType: String = ""
+    
+    fun setQueue(songs: List<Any>, startIndex: Int = 0, type: String) {
+        currentQueue = songs
+        currentIndex = startIndex.coerceIn(0, songs.size - 1)
+        queueType = type
+        if (songs.isNotEmpty() && currentIndex >= 0) {
+            currentSong = songs[currentIndex]
+        }
+        Log.d("MiniPlayerState", "Queue set: type=$type, size=${songs.size}, index=$currentIndex")
+    }
+    
+    fun getCurrentSongId(): Int? {
+        return when (val song = currentSong) {
+            is LocalSong -> song.id.toInt()
+            is TopSong -> song.id
+            is CountrySong -> song.id
+            else -> null
+        }
+    }
+    
+    fun getNextSong(): Any? {
+        return if (currentIndex + 1 < currentQueue.size) {
+            val nextSong = currentQueue[currentIndex + 1]
+            Log.d("MiniPlayerState", "Next song found: ${getSongTitle(nextSong)} (queue: $queueType)")
+            nextSong
+        } else {
+            Log.d("MiniPlayerState", "No next song in queue (queue: $queueType)")
+            null
+        }
+    }
+    
+    fun getPrevSong(): Any? {
+        return if (currentIndex > 0) {
+            val prevSong = currentQueue[currentIndex - 1]
+            Log.d("MiniPlayerState", "Prev song found: ${getSongTitle(prevSong)} (queue: $queueType)")
+            prevSong
+        } else {
+            Log.d("MiniPlayerState", "No prev song in queue (queue: $queueType)")
+            null
+        }
+    }
+    
+    fun moveToNext(): Boolean {
+        val next = getNextSong()
+        return if (next != null) {
+            currentIndex++
+            currentSong = next
+            Log.d("MiniPlayerState", "Moved to next: index=$currentIndex, song=${getSongTitle(next)}")
+            true
+        } else false
+    }
+    
+    fun moveToPrev(): Boolean {
+        val prev = getPrevSong()
+        return if (prev != null) {
+            currentIndex--
+            currentSong = prev
+            Log.d("MiniPlayerState", "Moved to prev: index=$currentIndex, song=${getSongTitle(prev)}")
+            true
+        } else false
+    }
+    
+    // Helper function
+    private fun getSongTitle(song: Any?): String {
+        return when (song) {
+            is LocalSong -> song.title
+            is TopSong -> song.title
+            is CountrySong -> song.title
+            else -> "Unknown"
+        }
+    }
 }
 
 @Composable
@@ -305,6 +382,66 @@ fun MiniPlayer(
                 )
             }
         }
+    }
+}
+
+fun playNext(context: Context) {
+    Log.d("MiniPlayer", "playNext called - Current queue type: ${MiniPlayerState.queueType}")
+    Log.d("MiniPlayer", "Current queue size: ${MiniPlayerState.currentQueue.size}")
+    Log.d("MiniPlayer", "Current index: ${MiniPlayerState.currentIndex}")
+    
+    if (MiniPlayerState.moveToNext()) {
+        val nextSong = MiniPlayerState.currentSong
+        when (nextSong) {
+            is LocalSong -> playSong(nextSong, context)
+            is TopSong -> playSong(nextSong, context)
+            is CountrySong -> playSong(nextSong, context)
+        }
+        Log.d("MiniPlayer", "Playing next song: ${getSongTitle(nextSong)} from ${MiniPlayerState.queueType} queue")
+    } else {
+        MiniPlayerState.mediaPlayer?.let { player ->
+            val duration = player.duration
+            if (duration > 0) {
+                player.seekTo(duration)
+                MiniPlayerState.currentPosition = duration
+                Log.d("MiniPlayer", "No next song, seeking to end")
+                
+                val serviceIntent = Intent(context, MusicNotificationService::class.java)
+                context.startForegroundService(serviceIntent)
+            }
+        }
+    }
+}
+
+fun playPrev(context: Context) {
+    Log.d("MiniPlayer", "playPrev called - Current queue type: ${MiniPlayerState.queueType}")
+    
+    if (MiniPlayerState.moveToPrev()) {
+        val prevSong = MiniPlayerState.currentSong
+        when (prevSong) {
+            is LocalSong -> playSong(prevSong, context)
+            is TopSong -> playSong(prevSong, context)
+            is CountrySong -> playSong(prevSong, context)
+        }
+        Log.d("MiniPlayer", "Playing prev song: ${getSongTitle(prevSong)} from ${MiniPlayerState.queueType} queue")
+    } else {
+        MiniPlayerState.mediaPlayer?.let { player ->
+            player.seekTo(0)
+            MiniPlayerState.currentPosition = 0
+            Log.d("MiniPlayer", "No previous song, seeking to start")
+            
+            val serviceIntent = Intent(context, MusicNotificationService::class.java)
+            context.startForegroundService(serviceIntent)
+        }
+    }
+}
+
+private fun getSongTitle(song: Any?): String {
+    return when (song) {
+        is LocalSong -> song.title
+        is TopSong -> song.title
+        is CountrySong -> song.title
+        else -> "Unknown"
     }
 }
 
@@ -926,7 +1063,7 @@ fun ExpandedPlayer(
                         val devices = getAvailableOutputDevices(context)
                         val activeDevice = devices.find { it.id == activeDeviceId }
 
-                        IconButton(onClick = { /* Previous song */}) {
+                        IconButton(onClick = { playPrev(context) }) {
                             Icon(
                                     painter = painterResource(id = R.drawable.skip_previous),
                                     contentDescription = "Previous",
@@ -974,7 +1111,7 @@ fun ExpandedPlayer(
                             )
                         }
 
-                        IconButton(onClick = { /* Next song */}) {
+                        IconButton(onClick = { playNext(context) }) {
                             Icon(
                                     painter = painterResource(id = R.drawable.skip_next),
                                     contentDescription = "Next",
@@ -1015,7 +1152,12 @@ fun ExpandedPlayer(
                                         else -> return
                                     }
                             IconButton(onClick = { showQrDialog = true }) {
-                                Icon(Icons.Default.QrCode, contentDescription = "Share QR")
+                                Icon(
+                                    Icons.Default.QrCode,
+                                    contentDescription = "Share QR",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp)
+                                )
                             }
                             if (showQrDialog) {
                                 when (onlineSong) {

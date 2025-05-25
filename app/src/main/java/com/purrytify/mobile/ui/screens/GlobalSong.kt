@@ -40,37 +40,43 @@ import com.purrytify.mobile.viewmodel.GlobalSongViewModel
 @Composable
 fun GlobalSong(navController: NavController, repository: SongRepository) {
     val viewModel =
-            androidx.lifecycle.viewmodel.compose.viewModel<GlobalSongViewModel>(
-                    factory = GlobalSongViewModel.provideFactory(repository)
-            )
+        androidx.lifecycle.viewmodel.compose.viewModel<GlobalSongViewModel>(
+            factory = GlobalSongViewModel.provideFactory(repository)
+        )
 
     val topSongs by viewModel.topSongs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     val gradient =
-            Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1C8075), Color(0xFF1D4569), Color(0xFF121212)),
-                    startY = 0f,
-                    endY = 1000f
-            )
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    Color(0xFF1C8075),
+                    Color(0xFF1D4569),
+                    Color(0xFF121212)
+                ),
+            startY = 0f,
+            endY = 1000f
+        )
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF121212))) {
         Box(
-                modifier =
-                        Modifier.fillMaxWidth()
-                                .height(600.dp) // Adjust this value to control gradient height
-                                .background(gradient)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(600.dp) // Adjust this value to control gradient height
+                    .background(gradient)
         )
 
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             IconButton(
-                    onClick = { navController.navigateUp() },
-                    modifier = Modifier.size(48.dp).padding(8.dp)
+                onClick = { navController.navigateUp() },
+                modifier = Modifier.size(48.dp).padding(8.dp)
             ) {
                 Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
                 )
             }
 
@@ -78,25 +84,27 @@ fun GlobalSong(navController: NavController, repository: SongRepository) {
 
             // Cover dan judul
             Image(
-                    painter = painterResource(id = R.drawable.top_50),
-                    contentDescription = "Top 50 Cover",
-                    modifier = Modifier.size(160.dp).align(Alignment.CenterHorizontally),
-                    contentScale = ContentScale.Crop
+                painter = painterResource(id = R.drawable.top_50),
+                contentDescription = "Top 50 Cover",
+                modifier =
+                    Modifier.size(160.dp).align(Alignment.CenterHorizontally),
+                contentScale = ContentScale.Crop
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                    text = "Your daily update of the most played tracks right now – Global.",
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.8f)
+                text =
+                    "Your daily update of the most played tracks right now – Global.",
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.8f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                    text = "Puritify • Apr 2025 • 2h 55min",
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.8f)
+                text = "Puritify • Apr 2025 • 2h 55min",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.8f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -105,10 +113,10 @@ fun GlobalSong(navController: NavController, repository: SongRepository) {
             LazyColumn {
                 itemsIndexed(topSongs) { index, song ->
                     SongItem(
-                            index = index + 1,
-                            song = song,
-                            viewModel = viewModel,
-                            navController = navController
+                        index = index + 1,
+                        song = song,
+                        viewModel = viewModel,
+                        navController = navController
                     )
                 }
             }
@@ -118,38 +126,49 @@ fun GlobalSong(navController: NavController, repository: SongRepository) {
 
 @Composable
 fun SongItem(
-        index: Int,
-        song: TopSong,
-        viewModel: GlobalSongViewModel,
-        navController: NavController
+    index: Int,
+    song: TopSong,
+    viewModel: GlobalSongViewModel,
+    navController: NavController
 ) {
     val context = LocalContext.current
-    val downloadProgress: Map<String, Float> = viewModel.downloadProgress.collectAsState().value
+    val topSongs by viewModel.topSongs.collectAsState()
+    val downloadProgress: Map<String, Float> =
+        viewModel.downloadProgress.collectAsState().value
 
     Row(
-            modifier =
-                    Modifier.fillMaxWidth()
-                            .clickable {
-                                Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                                playSong(song, context)
-                            }
-                            .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    Log.d(
+                        "GlobalSong",
+                        "Playing song: ${song.title}, URL: ${song.url}"
+                    )
+                    MiniPlayerState.setQueue(topSongs, index - 1, "global")
+                    playSong(song, context)
+                }
+                .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-                text = index.toString(),
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.width(24.dp)
+            text = index.toString(),
+            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.7f),
+            modifier = Modifier.width(24.dp)
         )
 
         Spacer(modifier = Modifier.width(8.dp))
 
         AsyncImage(
-                model = ImageRequest.Builder(context).data(song.artwork).crossfade(true).build(),
-                contentDescription = "Song artwork",
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)),
-                contentScale = ContentScale.Crop
+            model =
+                ImageRequest.Builder(context)
+                    .data(song.artwork)
+                    .crossfade(true)
+                    .build(),
+            contentDescription = "Song artwork",
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Crop
         )
 
         Spacer(modifier = Modifier.width(8.dp))
@@ -161,12 +180,12 @@ fun SongItem(
 
         // Download button
         IconButton(
-                onClick = {
-                    val downloadedSongs = viewModel.downloadedSongs.value
-                    if (!downloadedSongs.contains(song.id)) {
-                        viewModel.downloadSong(song, context)
-                    }
+            onClick = {
+                val downloadedSongs = viewModel.downloadedSongs.value
+                if (!downloadedSongs.contains(song.id)) {
+                    viewModel.downloadSong(song, context)
                 }
+            }
         ) {
             val progress = downloadProgress[song.id.toString()]
             val downloadedSongs by viewModel.downloadedSongs.collectAsState()
@@ -175,25 +194,28 @@ fun SongItem(
             when {
                 progress != null -> {
                     CircularProgressIndicator(
-                            progress = progress,
-                            color = Color(0xFF1DB954),
-                            modifier = Modifier.size(24.dp)
+                        progress = progress,
+                        color = Color(0xFF1DB954),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 isDownloaded -> {
                     Icon(
-                            painter = painterResource(id = R.drawable.download_done),
-                            contentDescription = "Downloaded",
-                            tint = Color(0xFF1DB954),
-                            modifier = Modifier.size(24.dp)
+                        painter = painterResource(id = R.drawable.download_done),
+                        contentDescription = "Downloaded",
+                        tint = Color(0xFF1DB954),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 else -> {
                     Icon(
-                            painter = painterResource(id = R.drawable.download_for_offline_24),
-                            contentDescription = "Download",
-                            tint = Color(0xFF1DB954),
-                            modifier = Modifier.size(24.dp)
+                        painter =
+                            painterResource(
+                                id = R.drawable.download_for_offline_24
+                            ),
+                        contentDescription = "Download",
+                        tint = Color(0xFF1DB954),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -201,24 +223,28 @@ fun SongItem(
 
         // Play button
         IconButton(
-                onClick = {
-                    Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                    playSong(song, context)
-                }
+            onClick = {
+                Log.d(
+                    "GlobalSong",
+                    "Playing song: ${song.title}, URL: ${song.url}"
+                )
+                MiniPlayerState.setQueue(topSongs, index - 1, "global")
+                playSong(song, context)
+            }
         ) {
             Icon(
-                    painter =
-                            painterResource(
-                                    id =
-                                            if (MiniPlayerState.currentUrl == song.url &&
-                                                            MiniPlayerState.isPlaying
-                                            )
-                                                    R.drawable.pause
-                                            else R.drawable.play_circle
-                            ),
-                    contentDescription = "Play",
-                    tint = Color(0xFF1DB954),
-                    modifier = Modifier.size(32.dp)
+                painter =
+                    painterResource(
+                        id =
+                            if (MiniPlayerState.currentUrl == song.url &&
+                                MiniPlayerState.isPlaying
+                            )
+                                R.drawable.pause
+                            else R.drawable.play_circle
+                    ),
+                contentDescription = "Play",
+                tint = Color(0xFF1DB954),
+                modifier = Modifier.size(32.dp)
             )
         }
     }

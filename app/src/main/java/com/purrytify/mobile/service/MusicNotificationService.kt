@@ -5,6 +5,7 @@ import android.content.*
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -21,6 +22,7 @@ import com.purrytify.mobile.data.room.TopSong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.utils.ListeningTracker
 import kotlinx.coroutines.*
+import java.io.File
 
 class MusicNotificationService : Service() {
 
@@ -99,12 +101,83 @@ class MusicNotificationService : Service() {
     }
 
     private fun playNext() {
-        // belum implement queue
+        if (MiniPlayerState.moveToNext()) {
+            val nextSong = MiniPlayerState.currentSong
+            when (nextSong) {
+                is LocalSong -> {
+                    try {
+                        playSongInService(nextSong)
+                        Log.d("MusicNotificationService", "Playing next song: ${nextSong.title}")
+                    } catch (e: Exception) {
+                        Log.e("MusicNotificationService", "Error playing next song: ${e.message}")
+                    }
+                }
+                is TopSong -> {
+                    try {
+                        playSongInService(nextSong.toLocalSong())
+                        Log.d("MusicNotificationService", "Playing next song: ${nextSong.title}")
+                    } catch (e: Exception) {
+                        Log.e("MusicNotificationService", "Error playing next song: ${e.message}")
+                    }
+                }
+                is CountrySong -> {
+                    try {
+                        playSongInService(nextSong.toLocalSong())
+                        Log.d("MusicNotificationService", "Playing next song: ${nextSong.title}")
+                    } catch (e: Exception) {
+                        Log.e("MusicNotificationService", "Error playing next song: ${e.message}")
+                    }
+                }
+            }
+        } else {
+            MiniPlayerState.mediaPlayer?.let { player ->
+                val duration = player.duration
+                if (duration > 0) {
+                    player.seekTo(duration)
+                    MiniPlayerState.currentPosition = duration
+                    Log.d("MusicNotificationService", "No next song, seeking to end")
+                }
+            }
+        }
         showNotification()
     }
 
     private fun playPrev() {
-        // belum implement queue
+        if (MiniPlayerState.moveToPrev()) {
+            val prevSong = MiniPlayerState.currentSong
+            when (prevSong) {
+                is LocalSong -> {
+                    try {
+                        playSongInService(prevSong)
+                        Log.d("MusicNotificationService", "Playing previous song: ${prevSong.title}")
+                    } catch (e: Exception) {
+                        Log.e("MusicNotificationService", "Error playing previous song: ${e.message}")
+                    }
+                }
+                is TopSong -> {
+                    try {
+                        playSongInService(prevSong.toLocalSong())
+                        Log.d("MusicNotificationService", "Playing previous song: ${prevSong.title}")
+                    } catch (e: Exception) {
+                        Log.e("MusicNotificationService", "Error playing previous song: ${e.message}")
+                    }
+                }
+                is CountrySong -> {
+                    try {
+                        playSongInService(prevSong.toLocalSong())
+                        Log.d("MusicNotificationService", "Playing previous song: ${prevSong.title}")
+                    } catch (e: Exception) {
+                        Log.e("MusicNotificationService", "Error playing previous song: ${e.message}")
+                    }
+                }
+            }
+        } else {
+            MiniPlayerState.mediaPlayer?.let { player ->
+                player.seekTo(0)
+                MiniPlayerState.currentPosition = 0
+                Log.d("MusicNotificationService", "No previous song, seeking to start")
+            }
+        }
         showNotification()
     }
 
@@ -288,5 +361,58 @@ class MusicNotificationService : Service() {
         MiniPlayerState.isPlaying = false
         ListeningTracker.stopListening()
         super.onDestroy()
+    }
+
+    private fun playSongInService(song: LocalSong) {
+        MiniPlayerState.mediaPlayer?.apply {
+            reset()
+            try {
+                when {
+                    song.isDownloaded && song.filePath.startsWith("/") -> {
+                        val file = File(song.filePath)
+                        if (file.exists()) {
+                            setDataSource(file.absolutePath)
+                        } else {
+                            throw Exception("Downloaded file not found: ${file.absolutePath}")
+                        }
+                    }
+                    song.filePath.startsWith("content://") -> {
+                        setDataSource(this@MusicNotificationService, Uri.parse(song.filePath))
+                    }
+                    song.filePath.startsWith("/") -> {
+                        val file = File(song.filePath)
+                        if (file.exists()) {
+                            setDataSource(file.absolutePath)
+                        } else {
+                            throw Exception("File not found: ${file.absolutePath}")
+                        }
+                    }
+                    song.filePath.startsWith("http") -> {
+                        setDataSource(song.filePath)
+                    }
+                    else -> {
+                        setDataSource(this@MusicNotificationService, Uri.parse(song.filePath))
+                    }
+                }
+
+                MiniPlayerState.currentUrl = song.filePath
+
+                setOnPreparedListener { mp ->
+                    MiniPlayerState.totalDuration = mp.duration
+                    MiniPlayerState.currentPosition = 0
+                    mp.start()
+                    MiniPlayerState.isPlaying = true
+                }
+
+                setOnErrorListener { mp, what, extra ->
+                    Log.e("MusicNotificationService", "MediaPlayer error: what=$what extra=$extra")
+                    false
+                }
+
+                prepareAsync()
+            } catch (e: Exception) {
+                Log.e("MusicNotificationService", "Error setting data source: ${e.message}", e)
+            }
+        }
     }
 }
