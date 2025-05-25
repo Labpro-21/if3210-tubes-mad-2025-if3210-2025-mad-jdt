@@ -2,42 +2,44 @@ package com.purrytify.mobile.data
 
 import android.content.Context
 import android.util.Log
-
 import com.purrytify.mobile.api.ApiClient
 import com.purrytify.mobile.api.SongService
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.data.room.LocalSongDao
 import com.purrytify.mobile.data.room.TopSong
-import retrofit2.Response
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class SongRepository(
-    private val songService: SongService,
-    private val localSongDao: LocalSongDao? = null,
-    private val context: Context? = null
+        private val songService: SongService,
+        private val localSongDao: LocalSongDao? = null,
+        private val context: Context? = null
 ) {
-    suspend fun getTopSongs(): Result<List<TopSong>> = withContext(Dispatchers.IO) {
-        try {
-            val response = songService.getTopSongs()
-            if (response.isSuccessful) {
-                response.body()?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("Response body is empty"))
-            } else {
-                Result.failure(Exception("Failed to fetch top songs: ${response.code()}"))
+    suspend fun getTopSongs(): Result<List<TopSong>> =
+            withContext(Dispatchers.IO) {
+                try {
+                    val response = songService.getTopSongs()
+                    if (response.isSuccessful) {
+                        response.body()?.let { Result.success(it) }
+                                ?: Result.failure(Exception("Response body is empty"))
+                    } else {
+                        Result.failure(Exception("Failed to fetch top songs: ${response.code()}"))
+                    }
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
             }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+
+    suspend fun isSongDownloaded(songId: Int): Boolean {
+        return localSongDao?.getDownloadedSongByTopSongId(songId) != null
     }
 
     suspend fun downloadSong(
-        song: TopSong,
-        onProgress: (Float) -> Unit,
-        onComplete: (LocalSong) -> Unit
+            song: TopSong,
+            onProgress: (Float) -> Unit,
+            onComplete: (LocalSong) -> Unit
     ) {
         if (context == null || localSongDao == null) {
             throw Exception("Context or LocalSongDao not available")
@@ -48,9 +50,7 @@ class SongRepository(
                 // Check if song is already downloaded
                 val existingSong = localSongDao.getDownloadedSongByTopSongId(song.id)
                 if (existingSong != null) {
-                    withContext(Dispatchers.Main) {
-                        onComplete(existingSong)
-                    }
+                    withContext(Dispatchers.Main) { onComplete(existingSong) }
                     return@withContext
                 }
 
@@ -91,9 +91,7 @@ class SongRepository(
                     val downloadedSong = song.toLocalSong(downloadedFilePath = file.absolutePath)
                     localSongDao.insert(downloadedSong)
 
-                    withContext(Dispatchers.Main) {
-                        onComplete(downloadedSong)
-                    }
+                    withContext(Dispatchers.Main) { onComplete(downloadedSong) }
                 } else {
                     throw Exception("Response body is null")
                 }
@@ -103,7 +101,7 @@ class SongRepository(
             }
         }
     }
-        
+
     suspend fun getSongById(songId: Int): TopSong? {
         Log.d("MiniPlayer", "getSongById called with id=$songId")
         val response = songService.getTopSongs(songId)
@@ -114,9 +112,9 @@ class SongRepository(
 
 // Update the factory function
 fun createSongRepository(
-    tokenManager: TokenManager,
-    localSongDao: LocalSongDao? = null,
-    context: Context? = null
+        tokenManager: TokenManager,
+        localSongDao: LocalSongDao? = null,
+        context: Context? = null
 ): SongRepository {
     val retrofit = ApiClient.buildRetrofit(tokenManager)
     val songService = ApiClient.createSongService(retrofit)
