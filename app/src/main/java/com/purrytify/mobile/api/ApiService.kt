@@ -29,55 +29,77 @@ data class RefreshTokenResponse(val accessToken: String, val refreshToken: Strin
 data class EditProfileResponse(val message: String)
 
 data class ProfileResponse(
-        val id: Int,
-        val username: String,
-        val email: String,
-        val profilePhoto: String?,
-        val location: String,
-        val createdAt: Date,
-        val updatedAt: Date
+    val id: Int,
+    val username: String,
+    val email: String,
+    val profilePhoto: String?,
+    val location: String,
+    val createdAt: Date,
+    val updatedAt: Date
 )
 
 interface AuthService {
-    @POST("api/login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+    @POST("api/login")
+    suspend fun login(
+        @Body request: LoginRequest
+    ): Response<LoginResponse>
 
     @GET("api/verify-token")
-    suspend fun verifyToken(@Header("Authorization") authorization: String): Response<Unit>
+    suspend fun verifyToken(
+        @Header("Authorization") authorization: String
+    ): Response<Unit>
 
     @POST("api/refresh-token")
-    suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest
+    ): Response<RefreshTokenResponse>
 }
 
 interface UserService {
     @GET("api/profile")
     suspend fun getProfile(
-            @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String
     ): Response<ProfileResponse>
 
     @Multipart
     @PATCH("api/profile")
     suspend fun editProfile(
-            @Header("Authorization") authorization: String,
-            @Part("location") location: RequestBody?,
-            @Part profilePhoto: MultipartBody.Part?
+        @Header("Authorization") authorization: String,
+        @Part("location") location: RequestBody?,
+        @Part profilePhoto: MultipartBody.Part?
     ): Response<EditProfileResponse>
 }
 
 interface SongService {
-    @GET("api/top-songs/global") suspend fun getTopSongs(): Response<List<TopSong>>
+    @GET("api/top-songs/global")
+    suspend fun getTopSongs(): Response<List<TopSong>>
 
-    @Streaming @GET suspend fun downloadFile(@Url fileUrl: String): Response<ResponseBody>
+    @Streaming
+    @GET
+    suspend fun downloadFile(
+        @Url fileUrl: String
+    ): Response<ResponseBody>
 
     @GET("api/songs/{songId}")
-    suspend fun getTopSongs(@Path("songId") songId: Int): Response<TopSong>
+    suspend fun getTopSongs(
+        @Path("songId") songId: Int
+    ): Response<TopSong>
 }
 
 interface CountrySongService {
     @GET("api/top-songs/{countryCode}")
     suspend fun getCountrySongs(
-            @Path("countryCode") countryCode: String
+        @Path("countryCode") countryCode: String
     ): Response<List<CountrySong>>
 
     @GET("api/songs/{songId}")
-    suspend fun getCountrySongById(@Path("songId") songId: Int): Response<CountrySong>
+    suspend fun getCountrySongById(
+        @Path("songId") songId: Int
+    ): Response<CountrySong>
+
+    @Streaming
+    @GET
+    suspend fun downloadFile(
+        @Url fileUrl: String
+    ): Response<ResponseBody>
 }

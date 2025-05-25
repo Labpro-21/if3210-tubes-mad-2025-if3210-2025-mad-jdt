@@ -60,9 +60,12 @@ import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.MiniPlayer
 import com.purrytify.mobile.ui.ScanQrScreen
 import com.purrytify.mobile.ui.initializeMediaPlayer
+import com.purrytify.mobile.ui.screens.CountrySong
+import com.purrytify.mobile.ui.screens.GlobalSong
+import com.purrytify.mobile.ui.screens.RecommendationSong
 import com.purrytify.mobile.ui.playSong
-import com.purrytify.mobile.ui.screens.CountrySong // Assuming this is CountrySongScreen
-import com.purrytify.mobile.ui.screens.GlobalSong // Assuming this is GlobalSongScreen
+import com.purrytify.mobile.ui.screens.CountrySong 
+import com.purrytify.mobile.ui.screens.GlobalSong 
 import com.purrytify.mobile.ui.screens.HomeScreen
 import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
@@ -76,6 +79,7 @@ import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont =
@@ -575,14 +579,48 @@ fun MainContent(
                     )
                 }
                 composable("country_song") {
+                    val context = LocalContext.current
+                    val localSongDao = remember {
+                        AppDatabase.getDatabase(context).localSongDao()
+                    }
                     val countrySongRepository = remember {
-                        createCountrySongRepository(tokenManager)
+                        createCountrySongRepository(
+                            tokenManager = tokenManager,
+                            localSongDao = localSongDao,
+                            context = context
+                        )
                     }
                     CountrySong(
                         navController = nestedNavController,
                         repository = countrySongRepository
                     )
                 }
+                composable("recommendation_song") {
+                    val context = LocalContext.current
+                    val localSongDao = remember {
+                        AppDatabase.getDatabase(context).localSongDao()
+                    }
+                    val globalSongRepository = remember {
+                        createSongRepository(
+                            tokenManager = tokenManager,
+                            localSongDao = localSongDao,
+                            context = context
+                        )
+                    }
+                    val countrySongRepository = remember {
+                        createCountrySongRepository(
+                            tokenManager = tokenManager,
+                            localSongDao = localSongDao,
+                            context = context
+                        )
+                    }
+                    RecommendationSong(
+                        navController = nestedNavController,
+                        globalRepository = globalSongRepository,
+                        countryRepository = countrySongRepository
+                    )
+                }
+
                 composable("top_artists") {
                     TopArtistsScreen(navController = nestedNavController)
                 }
@@ -592,6 +630,7 @@ fun MainContent(
                 composable("time_listened") {
                     TimeListenedScreen(navController = nestedNavController)
                 }
+
                 composable("scan_qr") {
                     ScanQrScreen(
                         navController = navController, // Pass main navController

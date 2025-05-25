@@ -6,60 +6,50 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.rememberImagePainter
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.purrytify.mobile.R
+import com.purrytify.mobile.data.CountrySongRepository
 import com.purrytify.mobile.data.SongRepository
-import com.purrytify.mobile.data.room.TopSong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.ui.playSong
-import com.purrytify.mobile.viewmodel.GlobalSongViewModel
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.produceState
-import androidx.navigation.NavHostController
-
+import com.purrytify.mobile.viewmodel.RecommendationSong
+import com.purrytify.mobile.viewmodel.RecommendationSongViewModel
 
 @Composable
-fun GlobalSong(
+fun RecommendationSong(
     navController: NavController,
-    repository: SongRepository
+    globalRepository: SongRepository,
+    countryRepository: CountrySongRepository
 ) {
-    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<GlobalSongViewModel>(
-        factory = GlobalSongViewModel.provideFactory(repository)
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<RecommendationSongViewModel>(
+        factory = RecommendationSongViewModel.provideFactory(globalRepository, countryRepository)
     )
     
-    val topSongs by viewModel.topSongs.collectAsState()
+    val recommendationSongs by viewModel.recommendationSongs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    
     
     val gradient = Brush.verticalGradient(
         colors = listOf(Color(0xFF1C8075), Color(0xFF1D4569), Color(0xFF121212)),
@@ -75,14 +65,15 @@ fun GlobalSong(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(600.dp)  // Adjust this value to control gradient height
+                .height(600.dp)
                 .background(gradient)
         )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)) {
+                .padding(16.dp)
+        ) {
             IconButton(
                 onClick = { navController.navigateUp() },
                 modifier = Modifier
@@ -98,10 +89,10 @@ fun GlobalSong(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Cover dan judul
+            // Cover and title
             Image(
-                painter = painterResource(id = R.drawable.top_50),
-                contentDescription = "Top 50 Cover",
+                painter = painterResource(id = R.drawable.recommendation_song),
+                contentDescription = "Recommendation Song Cover",
                 modifier = Modifier
                     .size(160.dp)
                     .align(Alignment.CenterHorizontally),
@@ -111,26 +102,48 @@ fun GlobalSong(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Your daily update of the most played tracks right now – Global.",
+                text = "Your personalized mix of global hits and local favorites.",
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.8f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Puritify • Apr 2025 • 2h 55min", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
+            Text(
+                text = "Purrytify • Mixed Playlist • ${recommendationSongs.size} songs", 
+                fontSize = 12.sp, 
+                color = Color.White.copy(alpha = 0.8f)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Daftar lagu
-            LazyColumn {
-                itemsIndexed(topSongs) { index, song ->
-                    SongItem(
-                        index = index + 1,
-                        song = song,
-                        viewModel = viewModel,
-                        navController = navController
-
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                }
+                recommendationSongs.isEmpty() -> {
+                    Text(
+                        text = "No recommendation songs available",
+                        color = Color.White,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .align(Alignment.CenterHorizontally)
                     )
+                }
+                else -> {
+                    LazyColumn {
+                        itemsIndexed(recommendationSongs) { index, song ->
+                            RecommendSongItem(
+                                index = index + 1,
+                                song = song,
+                                viewModel = viewModel
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -138,11 +151,10 @@ fun GlobalSong(
 }
 
 @Composable
-fun SongItem(
+fun RecommendSongItem(
     index: Int,
-    song: TopSong,
-    viewModel: GlobalSongViewModel,
-    navController: NavController
+    song: RecommendationSong,
+    viewModel: RecommendationSongViewModel
 ) {
     val context = LocalContext.current
     val downloadProgress: Map<String, Float> = viewModel.downloadProgress.collectAsState().value
@@ -151,8 +163,12 @@ fun SongItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                playSong(song, context)
+                Log.d("RecommendationSong", "Playing song: ${song.title}, URL: ${song.url}, Type: ${song.type}")
+                // Convert to appropriate type for playSong function
+                when (song.type) {
+                    "global" -> playSong(song.toTopSong(), context)
+                    "country" -> playSong(song.toCountrySong(), context)
+                }
             }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -184,7 +200,15 @@ fun SongItem(
             modifier = Modifier.weight(1f)
         ) {
             Text(text = song.title, fontSize = 16.sp, color = Color.White)
-            Text(text = song.artist, fontSize = 14.sp, color = Color.Gray)
+            Row {
+                Text(text = song.artist, fontSize = 14.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "• ${song.type}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF1DB954)
+                )
+            }
         }
 
         // Download button
@@ -213,8 +237,11 @@ fun SongItem(
         // Play button
         IconButton(
             onClick = {
-                Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                playSong(song, context)
+                Log.d("RecommendationSong", "Playing song: ${song.title}, URL: ${song.url}, Type: ${song.type}")
+                when (song.type) {
+                    "global" -> playSong(song.toTopSong(), context)
+                    "country" -> playSong(song.toCountrySong(), context)
+                }
             }
         ) {
             Icon(
