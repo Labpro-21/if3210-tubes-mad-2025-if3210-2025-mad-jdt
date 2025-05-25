@@ -61,6 +61,19 @@ import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.purrytify.mobile.data.SongRepository
+import com.purrytify.mobile.data.CountrySongRepository
+import com.purrytify.mobile.ui.ScanQrScreen
+import com.purrytify.mobile.ui.playSong
+import com.purrytify.mobile.data.room.TopSong
+import com.purrytify.mobile.data.room.CountrySong
+
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -68,6 +81,8 @@ val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
 }
 
 class MainActivity : ComponentActivity() {
+
+    private var navController: NavHostController? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -79,8 +94,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleDeepLink(intent)
         Log.d("MainActivity", "onCreate: MainActivity is starting!")
 
         // Handle logout intent
@@ -141,6 +162,22 @@ class MainActivity : ComponentActivity() {
                 val poppinsFontFamily: FontFamily = rememberPoppinsFontFamily()
                 CompositionLocalProvider(LocalPoppinsFont provides poppinsFontFamily) {
                     val navController = rememberNavController()
+                    this@MainActivity.navController = navController
+
+                    LaunchedEffect(Unit) {
+                        val data = intent?.data
+                        if (data != null && data.scheme == "purrytify" && data.host == "song") {
+                            val songId = data.lastPathSegment?.toIntOrNull()
+                            val type = data.getQueryParameter("type")
+                            if (songId != null) {
+                                if (type == "country") {
+                                    navController.navigate("country_song_player/$songId")
+                                } else {
+                                    navController.navigate("global_song_player/$songId")
+                                }
+                            }
+                        }
+                    }
 
                     val startDestination = remember {
                         if (checkInitialAuthState(tokenManager)) "main" else "auth"
@@ -189,6 +226,83 @@ class MainActivity : ComponentActivity() {
                                 tokenManager = tokenManager // Pass tokenManager
                             )
                         }
+
+                        composable(
+                            route = "global_song_player/{songId}",
+                            arguments = listOf(navArgument("songId") { type = NavType.IntType })
+                        ) { navBackStackEntry ->
+                            val songId = navBackStackEntry.arguments?.getInt("songId")
+                            if (songId != null) {
+                                val songRepository = remember { createSongRepository(tokenManager) }
+                                val context = LocalContext.current
+                                val song by produceState<TopSong?>(initialValue = null, songId) {
+                                    Log.d("MiniPlayer", "produceState: fetching songId=$songId")
+                                    value = songRepository.getSongById(songId)
+                                    Log.d("MiniPlayer", "produceState: result=${value?.title}")
+                                }
+
+                                LaunchedEffect(song) {
+                                    if (song != null) {
+                                        Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+                                        playSong(song!!, context)
+                                        navController.navigate("main") {
+                                            popUpTo("global_song_player/{songId}") { inclusive = true }
+                                        }
+                                    }
+                                }
+
+                                if (song != null) {
+                                    GlobalSongPlayer(
+                                        navController = navController,
+                                        repository = songRepository,
+                                        songId = songId
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
+                            }
+                        }
+
+                        composable(
+                            route = "country_song_player/{songId}",
+                            arguments = listOf(navArgument("songId") { type = NavType.IntType })
+                        ) { navBackStackEntry ->
+                            val songId = navBackStackEntry.arguments?.getInt("songId")
+                            if (songId != null) {
+                                val countrySongRepository = remember { createCountrySongRepository(tokenManager) }
+                                val context = LocalContext.current
+                                val song by produceState<CountrySong?>(initialValue = null, songId) {
+                                    Log.d("MiniPlayer", "produceState: fetching songId=$songId")
+                                    value = countrySongRepository.getCountrySongById(songId)
+                                    Log.d("MiniPlayer", "produceState: result=${value?.title}")
+                                }
+                        
+                                LaunchedEffect(song) {
+                                    if (song != null) {
+                                        Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+                                        playSong(song!!, context)
+                                        navController.navigate("main") {
+                                            popUpTo("country_song_player/{songId}") { inclusive = true }
+                                        }
+                                    }
+                                }
+
+                                if (song != null) {
+                                    CountrySongPlayer(
+                                        navController = navController,
+                                        repository = countrySongRepository,
+                                        songId = songId
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
+                            }
+                        }
+
                     }
                 }
             }
@@ -202,6 +316,21 @@ class MainActivity : ComponentActivity() {
             tokenManager.getAccessToken() != null // Use the blocking version here
         Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
         return hasToken
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data
+        if (data != null && data.scheme == "purrytify" && data.host == "song") {
+            val songId = data.lastPathSegment?.toIntOrNull()
+            val type = data.getQueryParameter("type") // misal: purrytify://song/123?type=country
+            if (songId != null) {
+                if (type == "country") {
+                    navController?.navigate("country_song_player/$songId")
+                } else {
+                    navController?.navigate("global_song_player/$songId")
+                }
+            }
+        }
     }
 
     @Composable
@@ -258,20 +387,29 @@ class MainActivity : ComponentActivity() {
 // --- Main Authenticated Content Composable ---
 @Composable
 fun MainContent(
-    navController: NavHostController, // Top-level controller for logout
-    authRepository: AuthRepository, // Pass the repository instance
+    navController: NavHostController,
+    authRepository: AuthRepository,
     userRepository: UserRepository,
     networkConnectivityObserver: NetworkConnectivityObserver,
-    tokenManager: TokenManager // Added tokenManager parameter
+    tokenManager: TokenManager
 ) {
-    val nestedNavController = rememberNavController() // Controller for bottom nav sections
-    val scope =
-        rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+    val nestedNavController = rememberNavController()
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus = networkConnectivityObserver.observe()
         .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
     val localSongViewModel: LocalSongViewModel = viewModel()
+
+    // Callback untuk handle QR result
+    val handleQrResult: (Int, String?) -> Unit = { songId, type ->
+        Log.d("MainActivity", "handleQrResult called with songId: $songId, type: $type")
+        if (type == "country") {
+            navController.navigate("country_song_player/$songId")
+        } else {
+            navController.navigate("global_song_player/$songId")
+        }
+    }
 
     // Initialize MediaPlayer
     LaunchedEffect(Unit) { initializeMediaPlayer(context) }
@@ -283,16 +421,14 @@ fun MainContent(
             NetworkConnectivityObserver.Status.LOST -> {
                 snackbarHostState.showSnackbar("No network connection")
             }
-
             NetworkConnectivityObserver.Status.AVAILABLE -> {
                 if (snackbarHostState.currentSnackbarData != null) {
                     snackbarHostState.currentSnackbarData?.dismiss()
-                    delay(300) // Give time for previous snackbar to dismiss
+                    delay(300)
                     snackbarHostState.showSnackbar("Network connection restored")
                 }
             }
-
-            else -> {} // Do nothing for LOSING state
+            else -> {}
         }
     }
 
@@ -319,19 +455,25 @@ fun MainContent(
                 modifier = Modifier.padding(innerPadding)
             ) {
                 composable(BottomNavItem.Home.route) {
-                    HomeScreen(navController = nestedNavController)
+                    HomeScreen(
+                        navController = navController, // Pass main navController
+                        nestedNavController = nestedNavController,
+                        onQrResult = handleQrResult // Pass callback
+                    )
                 }
-                composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Library.route) { 
+                    YourLibraryScreen(/* Pass dependencies */) 
+                }
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
-                        authRepository = authRepository, // Pass the repository instance
+                        authRepository = authRepository,
                         userRepository = userRepository,
-                        networkConnectivityObserver = networkConnectivityObserver, // Add this parameter
+                        networkConnectivityObserver = networkConnectivityObserver,
                         onLogout = {
-                            scope.launch { // Use the scope obtained from rememberCoroutineScope()
+                            scope.launch {
                                 authRepository.logout()
-                                navController.navigate("auth") { // Navigate back to auth flow
-                                    popUpTo("main") { inclusive = true } // Clear main backstack
+                                navController.navigate("auth") {
+                                    popUpTo("main") { inclusive = true }
                                     launchSingleTop = true
                                 }
                             }
@@ -357,14 +499,62 @@ fun MainContent(
                 }
                 composable("country_song") {
                     val countrySongRepository = remember {
-                        createCountrySongRepository(tokenManager) // Use passed tokenManager
+                        createCountrySongRepository(tokenManager)
                     }
                     CountrySong(
                         navController = nestedNavController,
                         repository = countrySongRepository
                     )
                 }
+                composable("scan_qr") {
+                    ScanQrScreen(
+                        navController = navController, // Pass main navController
+                        onQrResult = handleQrResult // Pass callback
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+fun GlobalSongPlayer(
+    navController: NavHostController,
+    repository: SongRepository,
+    songId: Int
+) {
+    val context = LocalContext.current
+    val song by produceState<TopSong?>(initialValue = null, songId) {
+        value = repository.getSongById(songId)
+    }
+
+    LaunchedEffect(song) {
+        if (song != null) {
+            Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+            playSong(song!!, context)
+        }
+    }
+
+    // ...UI player untuk TopSong...
+}
+
+@Composable
+fun CountrySongPlayer(
+    navController: NavHostController,
+    repository: CountrySongRepository,
+    songId: Int
+) {
+    val context = LocalContext.current
+    val song by produceState<CountrySong?>(initialValue = null, songId) {
+        value = repository.getCountrySongById(songId)
+    }
+
+    LaunchedEffect(song) {
+        if (song != null) {
+            Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+            playSong(song!!, context)
+        }
+    }
+
+    // ...UI player untuk CountrySong (bisa sama dengan GlobalSongPlayer)...
 }

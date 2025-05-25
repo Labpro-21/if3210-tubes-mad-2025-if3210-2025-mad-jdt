@@ -7,11 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,11 +26,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.bumptech.glide.Glide
 import com.purrytify.mobile.LocalPoppinsFont
 import com.purrytify.mobile.R
+import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.data.room.LocalSong
+import com.purrytify.mobile.data.room.TopSong
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import androidx.core.net.toUri
-import java.io.File
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedVisibility
@@ -48,10 +47,6 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -60,28 +55,33 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Share
 import android.content.Intent
+import android.graphics.Bitmap
+import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.filled.QrCode
 import com.purrytify.mobile.service.MusicNotificationService
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import androidx.compose.material.icons.filled.Speaker
-import androidx.compose.material.icons.materialIcon
-import androidx.room.util.TableInfo
-import com.purrytify.mobile.ui.AudioOutputBottomSheet
-import com.purrytify.mobile.utils.OutputDevice
 import com.purrytify.mobile.utils.setAudioOutput
 import com.purrytify.mobile.utils.getAvailableOutputDevices
+import com.purrytify.mobile.utils.shareSong
+import com.purrytify.mobile.utils.generateQrCode
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.window.Dialog
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
 
 object MiniPlayerState {
     var mediaPlayer: MediaPlayer? = null
-    var currentSong: LocalSong? by mutableStateOf(null)
+    var currentSong: Any? by mutableStateOf(null)
     var isPlaying by mutableStateOf(false)
     var currentPosition by mutableStateOf(0)
     var totalDuration by mutableStateOf(0)
@@ -96,6 +96,8 @@ fun MiniPlayer(
     onDeleteClick: (LocalSong) -> Unit,
     viewModel: LocalSongViewModel 
 ) {
+    val context = LocalContext.current
+
     LaunchedEffect(MiniPlayerState.isPlaying) {
         while (isActive && MiniPlayerState.isPlaying) {
             MiniPlayerState.currentPosition = MiniPlayerState.mediaPlayer?.currentPosition ?: 0
@@ -122,6 +124,25 @@ fun MiniPlayer(
     }
 
     MiniPlayerState.currentSong?.let { song ->
+        val title = when (song) {
+            is LocalSong -> song.title
+            is TopSong -> song.title
+            is CountrySong -> song.title
+            else -> ""
+        }
+        val artist = when (song) {
+            is LocalSong -> song.artist
+            is TopSong -> song.artist
+            is CountrySong -> song.artist
+            else -> ""
+        }
+        val artworkPath = when (song) {
+            is LocalSong -> song.artworkPath
+            is TopSong -> song.artwork
+            is CountrySong -> song.artwork
+            else -> null
+        }
+
         Column(
             modifier = modifier
                 .fillMaxWidth()
@@ -153,7 +174,7 @@ fun MiniPlayer(
                         .background(Color.DarkGray, RoundedCornerShape(4.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (song.artworkPath != null) {
+                    if (artworkPath != null) {
                         AndroidView(
                             factory = { ctx ->
                                 ImageView(ctx).apply {
@@ -162,7 +183,7 @@ fun MiniPlayer(
                             },
                             update = { imageView ->
                                 Glide.with(imageView)
-                                    .load(song.artworkPath.toUri())
+                                    .load(artworkPath.toUri())
                                     .centerCrop()
                                     .placeholder(R.drawable.placeholder_album)
                                     .into(imageView)
@@ -185,7 +206,7 @@ fun MiniPlayer(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = song.title,
+                        text = title,
                         style = TextStyle(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
@@ -200,7 +221,7 @@ fun MiniPlayer(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = song.artist,
+                            text = artist,
                             style = TextStyle(
                                 fontSize = 12.sp,
                                 fontFamily = LocalPoppinsFont.current,
@@ -224,14 +245,22 @@ fun MiniPlayer(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                IconButton(
-                    onClick = { /* share song */ }
-                ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "share song",
-                        tint = Color.White,
-                    )
+                if (MiniPlayerState.currentSong is TopSong || MiniPlayerState.currentSong is CountrySong) {
+                    val onlineSong = MiniPlayerState.currentSong
+                    val songId = when (onlineSong) {
+                        is TopSong -> onlineSong.id
+                        is CountrySong -> onlineSong.id
+                        else -> return
+                    }
+                    IconButton(
+                        onClick = { shareSong(context, songId) }
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "share song",
+                            tint = Color.White,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -392,7 +421,67 @@ fun playSong(song: LocalSong, context: android.content.Context) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+fun playSong(song: TopSong, context: android.content.Context) {
+    Log.d("MiniPlayer", "playSong TopSong: ${song.title}")
+    MiniPlayerState.currentSong = song
+    playSong(song.toLocalSong(), context)
+     MiniPlayerState.currentSong = song
+}
+
+fun playSong(song: CountrySong, context: android.content.Context) {
+    Log.d("MiniPlayer", "playSong CountrySong: ${song.title}")
+    MiniPlayerState.currentSong = song
+    playSong(song.toLocalSong(), context)
+     MiniPlayerState.currentSong = song
+}
+
+@Composable
+fun ShareQrDialog(
+    songId: Int,
+    title: String,
+    artist: String,
+    onDismiss: () -> Unit,
+    context: android.content.Context
+) {
+    val qrBitmap = remember(songId) { generateQrCode("purrytify://song/$songId") }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.background(Color.White, RoundedCornerShape(16.dp)).padding(24.dp)
+        ) {
+            Image(
+                bitmap = qrBitmap.asImageBitmap(),
+                contentDescription = "QR Code",
+                modifier = Modifier.size(220.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(title, color = Color.Black, fontWeight = FontWeight.Bold)
+            Text(artist, color = Color.Gray, fontSize = 12.sp)
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = {
+                // Share QR as image
+                val file = File(context.cacheDir, "qr_${songId}.png")
+                FileOutputStream(file).use { out ->
+                    qrBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.provider",
+                    file
+                )
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Share QR via"))
+            }) {
+                Text("Share QR")
+            }
+        }
+    }
+}
+
 @Composable
 fun ExpandedPlayer(
     onDismiss: () -> Unit,
@@ -404,52 +493,56 @@ fun ExpandedPlayer(
     val context = LocalContext.current
     var showAudioSheet by remember { mutableStateOf(false) }
     var activeDeviceId by remember { mutableStateOf<Int?>(null) }
+    var showQrDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text(
-                    "Delete Song",
-                    color = Color.White
-                )
-            },
-            text = {
-                Text(
-                    "Are you sure you want to delete \"${MiniPlayerState.currentSong?.title}\"?",
-                    color = Color.White
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        MiniPlayerState.currentSong?.let { song ->
+        val song = MiniPlayerState.currentSong
+        if (song is LocalSong) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = {
+                    Text(
+                        "Delete Song",
+                        color = Color.White
+                    )
+                },
+                text = {
+                    Text(
+                        "Are you sure you want to delete \"${song.title}\"?",
+                        color = Color.White
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
                             onDeleteClick(song)
                             MiniPlayerState.isExpanded = false
-                        }
-                        showDeleteDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Red
-                    )
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = { showDeleteDialog = false },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.DarkGray
-                    )
-                ) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = Color(0xFF282828),
-            titleContentColor = Color.White,
-            textContentColor = Color.White
-        )
+                            showDeleteDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red
+                        )
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showDeleteDialog = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.DarkGray
+                        )
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+                containerColor = Color(0xFF282828),
+                titleContentColor = Color.White,
+                textContentColor = Color.White
+            )
+        } else {
+            showDeleteDialog = false
+        }
     }
 
     Box(
@@ -516,52 +609,74 @@ fun ExpandedPlayer(
                 }
 
                 Box {
-                    IconButton(onClick = { showOptions = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "More Options",
-                            tint = Color.Gray
-                        )
-                    }
+                    if (MiniPlayerState.currentSong is LocalSong) {
+                        IconButton(onClick = { showOptions = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "More Options",
+                                tint = Color.Gray
+                            )
+                        }
 
-                    DropdownMenu(
-                        expanded = showOptions,
-                        onDismissRequest = { showOptions = false },
-                        modifier = Modifier.background(Color(0xFF282828))
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit", color = Color.White) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = Color.White
-                                )
-                            },
-                            onClick = {
-                                showOptions = false
-                            }
-                        )
+                        DropdownMenu(
+                            expanded = showOptions,
+                            onDismissRequest = { showOptions = false },
+                            modifier = Modifier.background(Color(0xFF282828))
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit", color = Color.White) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        tint = Color.White
+                                    )
+                                },
+                                onClick = {
+                                    showOptions = false
+                                }
+                            )
 
-                        DropdownMenuItem(
-                            text = { Text("Delete", color = Color.Red) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    tint = Color.Red
-                                )
-                            },
-                            onClick = {
-                                showOptions = false
-                                showDeleteDialog = true
-                            }
-                        )
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = Color.Red) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.Red
+                                    )
+                                },
+                                onClick = {
+                                    showOptions = false
+                                    showDeleteDialog = true
+                                }
+                            )
+                        }
                     }
                 }
             }
 
             MiniPlayerState.currentSong?.let { song ->
+                val title = when (song) {
+                    is LocalSong -> song.title
+                    is TopSong -> song.title
+                    is CountrySong -> song.title
+                    else -> ""
+                }
+                val artist = when (song) {
+                    is LocalSong -> song.artist
+                    is TopSong -> song.artist
+                    is CountrySong -> song.artist
+                    else -> ""
+                }
+                val artworkPath = when (song) {
+                    is LocalSong -> song.artworkPath
+                    is TopSong -> song.artwork
+                    is CountrySong -> song.artwork
+                    else -> null
+                }
+                val isLiked = (song as? LocalSong)?.isLiked == true
+
                 // Album artwork
                 Box(
                     modifier = Modifier
@@ -574,7 +689,7 @@ fun ExpandedPlayer(
                             .background(Color.DarkGray, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (song.artworkPath != null) {
+                        if (artworkPath != null) {
                             AndroidView(
                                 factory = { ctx ->
                                     ImageView(ctx).apply {
@@ -583,7 +698,7 @@ fun ExpandedPlayer(
                                 },
                                 update = { imageView ->
                                     Glide.with(imageView)
-                                        .load(Uri.parse(song.artworkPath))
+                                        .load(Uri.parse(artworkPath))
                                         .centerCrop()
                                         .placeholder(R.drawable.placeholder_album)
                                         .into(imageView)
@@ -614,7 +729,7 @@ fun ExpandedPlayer(
                         horizontalAlignment = Alignment.Start
                     ) {
                         Text(
-                            text = song.title,
+                            text = title,
                             style = TextStyle(
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Bold,
@@ -627,7 +742,7 @@ fun ExpandedPlayer(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = song.artist,
+                            text = artist,
                             style = TextStyle(
                                 fontSize = 20.sp,
                                 fontFamily = LocalPoppinsFont.current,
@@ -638,23 +753,23 @@ fun ExpandedPlayer(
                     }
 
                     // Like button
-                    IconButton(
-                        onClick = { 
-                            MiniPlayerState.currentSong?.let { song ->
+                    if (song is LocalSong) {
+                        IconButton(
+                            onClick = {
                                 viewModel.toggleLikeStatus(song)
-                            }
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        val isLiked = MiniPlayerState.currentSong?.isLiked == true
-                        Icon(
-                            painter = painterResource(
-                                id = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
-                            ),
-                            contentDescription = if (isLiked) "Unlike" else "Like",
-                            tint = if (isLiked) Color(0xFF1DB954) else Color.Gray,
-                            modifier = Modifier.size(32.dp)
-                        )
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            val isLiked = song.isLiked
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+                                ),
+                                contentDescription = if (isLiked) "Unlike" else "Like",
+                                tint = if (isLiked) Color(0xFF1DB954) else Color.Gray,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
 
@@ -824,15 +939,54 @@ fun ExpandedPlayer(
                             )
                         }
 
-                        IconButton(
-                            onClick = { /* share song */ }
-                        ) {
-                            Icon(
-                                Icons.Default.Share,
-                                contentDescription = "share song",
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
-                            )
+                        if (MiniPlayerState.currentSong is TopSong || MiniPlayerState.currentSong is CountrySong) {
+                            val onlineSong = MiniPlayerState.currentSong
+                            val songId = when (onlineSong) {
+                                is TopSong -> onlineSong.id
+                                is CountrySong -> onlineSong.id
+                                else -> return
+                            }
+                            IconButton(
+                                onClick = { shareSong(context, songId) }
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "share song",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        // QR BUTTON
+                        if (MiniPlayerState.currentSong is TopSong || MiniPlayerState.currentSong is CountrySong) {
+                            val onlineSong = MiniPlayerState.currentSong
+                            val songId = when (onlineSong) {
+                                is TopSong -> onlineSong.id
+                                is CountrySong -> onlineSong.id
+                                else -> return
+                            }
+                            IconButton(onClick = { showQrDialog = true }) {
+                                Icon(Icons.Default.QrCode, contentDescription = "Share QR")
+                            }
+                            if (showQrDialog) {
+                                when (onlineSong) {
+                                    is TopSong -> ShareQrDialog(
+                                        songId = onlineSong.id,
+                                        title = onlineSong.title,
+                                        artist = onlineSong.artist,
+                                        onDismiss = { showQrDialog = false },
+                                        context = context
+                                    )
+                                    is CountrySong -> ShareQrDialog(
+                                        songId = onlineSong.id,
+                                        title = onlineSong.title,
+                                        artist = onlineSong.artist,
+                                        onDismiss = { showQrDialog = false },
+                                        context = context
+                                    )
+                                }
+                            }
                         }
                     }
 

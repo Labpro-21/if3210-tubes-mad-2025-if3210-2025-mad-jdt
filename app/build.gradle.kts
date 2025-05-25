@@ -82,6 +82,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation("androidx.media:media:1.6.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     
     // OpenStreetMap for embedded map without API keys
     implementation("org.osmdroid:osmdroid-android:6.1.17")

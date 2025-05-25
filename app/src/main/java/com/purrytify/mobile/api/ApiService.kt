@@ -16,6 +16,7 @@ import com.purrytify.mobile.data.room.CountrySong
 import okhttp3.ResponseBody
 import retrofit2.http.Streaming
 import retrofit2.http.Url
+import retrofit2.http.Path
 
 data class LoginRequest(
     val email: String,
@@ -85,12 +86,22 @@ interface UserService {
 interface SongService {
     @GET("api/top-songs/global")
     suspend fun getTopSongs(): Response<List<TopSong>>
+
     @Streaming
     @GET
     suspend fun downloadFile(@Url fileUrl: String): Response<ResponseBody>
+
+
+    @GET("api/songs/{songId}")
+    suspend fun getTopSongs(@Path("songId") songId: Int): Response<TopSong>
+
 }
 
 interface CountrySongService {
     @GET("api/top-songs/ID")
     suspend fun getCountrySongs(): Response<List<CountrySong>>
+
+    @GET("api/songs/{songId}")
+    suspend fun getCountrySongs(@Path("songId") songId: Int): Response<CountrySong>
+
 }
