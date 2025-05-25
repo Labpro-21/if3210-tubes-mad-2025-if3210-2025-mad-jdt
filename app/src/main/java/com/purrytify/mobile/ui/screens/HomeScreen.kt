@@ -135,45 +135,6 @@ fun HomeScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                val activity = LocalContext.current as? Activity
-                IconButton(onClick = {
-                    Log.d("ScanQR", "Button clicked")
-                    try {
-                        val activity = context as? Activity
-                        if (activity == null) {
-                            Log.e("ScanQR", "Context is not Activity")
-                            errorMessage = "Error: Context bukan Activity"
-                            return@IconButton
-                        }
-                        
-                        Log.d("ScanQR", "Creating IntentIntegrator")
-                        val integrator = IntentIntegrator(activity)
-                        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
-                        integrator.setPrompt("Scan QR lagu Purrytify")
-                        integrator.setOrientationLocked(true)
-                        
-                        Log.d("ScanQR", "Launching scanner")
-                        launcher.launch(integrator.createScanIntent())
-                        Log.d("ScanQR", "Scanner launched")
-                    } catch (e: Exception) {
-                        Log.e("ScanQR", "Error launching scanner: ${e.message}")
-                        errorMessage = "Error: ${e.message}"
-                }
-                }) {
-                    Icon(
-                        imageVector = Icons.Filled.QrCodeScanner,
-                        contentDescription = "Scan QR",
-                        tint = Color.White
-                    )
-                }
-            }
-
             // Main content
             LazyColumn(
                 modifier = Modifier
@@ -183,16 +144,60 @@ fun HomeScreen(
             ) {
                 // New Songs Section First
                 item {
-                    Text(
-                        text = "Charts",
-                        style = TextStyle(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = LocalPoppinsFont.current,
-                            color = Color.White
-                        ),
-                        modifier = Modifier.padding(top = 24.dp, bottom = 16.dp)
-                    )
+                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 24.dp, bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Charts text on the left
+                        Text(
+                            text = "Charts",
+                            style = TextStyle(
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = LocalPoppinsFont.current,
+                                color = Color.White
+                            )
+                        )
+                        
+                        // QR Scanner button on the right
+                        IconButton(
+                            onClick = {
+                                Log.d("ScanQR", "Button clicked")
+                                try {
+                                    val activity = context as? Activity
+                                    if (activity == null) {
+                                        Log.e("ScanQR", "Context is not Activity")
+                                        errorMessage = "Error: Context bukan Activity"
+                                        return@IconButton
+                                    }
+                                    
+                                    Log.d("ScanQR", "Creating IntentIntegrator")
+                                    val integrator = IntentIntegrator(activity)
+                                    integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+                                    integrator.setPrompt("Scan QR lagu Purrytify")
+                                    integrator.setOrientationLocked(true)
+                                    
+                                    Log.d("ScanQR", "Launching scanner")
+                                    launcher.launch(integrator.createScanIntent())
+                                    Log.d("ScanQR", "Scanner launched")
+                                } catch (e: Exception) {
+                                    Log.e("ScanQR", "Error launching scanner: ${e.message}")
+                                    errorMessage = "Error: ${e.message}"
+                                }
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.QrCodeScanner,
+                                contentDescription = "Scan QR",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
 
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -228,6 +233,24 @@ fun HomeScreen(
                                 Image(
                                     painter = painterResource(id = R.drawable.country_top_50),
                                     contentDescription = "Country Top 50 Cover",
+                                    modifier = Modifier
+                                        .size(150.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .clickable {
+                                        nestedNavController.navigate("recommendation_song")
+                                    }
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.recommendation_song),
+                                    contentDescription = "Recommendation Cover",
                                     modifier = Modifier
                                         .size(150.dp)
                                         .clip(RoundedCornerShape(8.dp)),

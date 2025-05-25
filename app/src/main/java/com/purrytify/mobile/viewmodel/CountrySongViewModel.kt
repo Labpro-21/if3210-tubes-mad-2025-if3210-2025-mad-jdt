@@ -11,13 +11,28 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.purrytify.mobile.data.CountrySongRepository
 import com.purrytify.mobile.data.room.CountrySong
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class CountrySongViewModel(private val repository: CountrySongRepository) : ViewModel() {
+sealed class CountrySongUiState {
+    object Loading : CountrySongUiState()
+
+    data class Success(val songs: List<CountrySong>) : CountrySongUiState()
+
+    data class Error(val message: String) : CountrySongUiState()
+
+    object CountryNotSupported : CountrySongUiState()
+}
+
+class CountrySongViewModel(private val repository: CountrySongRepository) :
+    ViewModel() {
+    private val _uiState =
+        MutableStateFlow<CountrySongUiState>(CountrySongUiState.Loading)
+    val uiState: StateFlow<CountrySongUiState> = _uiState.asStateFlow()
+
+    // Keep these for backward compatibility
     private val _countrySongs = MutableStateFlow<List<CountrySong>>(emptyList())
     val countrySongs: StateFlow<List<CountrySong>> = _countrySongs.asStateFlow()
 
@@ -25,60 +40,135 @@ class CountrySongViewModel(private val repository: CountrySongRepository) : View
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _downloadProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val downloadProgress: StateFlow<Map<String, Float>> = _downloadProgress.asStateFlow()
+    val downloadProgress: StateFlow<Map<String, Float>> =
+        _downloadProgress.asStateFlow()
+
+    private val _downloadedSongs = MutableStateFlow<Set<Int>>(emptySet())
+    val downloadedSongs: StateFlow<Set<Int>> = _downloadedSongs.asStateFlow()
 
     init {
-        fetchCountrySongs()
+        checkCountrySupportAndFetch()
     }
 
-    private fun fetchCountrySongs() {
+    private fun checkCountrySupportAndFetch() {
         viewModelScope.launch {
+            _uiState.value = CountrySongUiState.Loading
             _isLoading.value = true
             try {
-                repository.getCountrySongs()
-                    .onSuccess { songs ->
-                        Log.d("CountrySongViewModel", "Fetched ${songs.size} songs")
-                        _countrySongs.value = songs
-                    }
-                    .onFailure { error ->
-                        Log.e("CountrySongViewModel", "Error fetching songs: ${error.message}")
-                    }
+                val supportResult = repository.isCountrySupported()
+                if (supportResult.isFailure) {
+                    val error =
+                        supportResult.exceptionOrNull()?.message ?: "Unknown error"
+                    Log.e(
+                        "CountrySongViewModel",
+                        "Error checking country support: $error"
+                    )
+                    _uiState.value = CountrySongUiState.Error(error)
+                    return@launch
+                }
+
+                val isSupported = supportResult.getOrNull() ?: false
+                if (!isSupported) {
+                    Log.d("CountrySongViewModel", "Country not supported")
+                    _uiState.value = CountrySongUiState.CountryNotSupported
+                    return@launch
+                }
+
+                fetchCountrySongs()
             } catch (e: Exception) {
-                Log.e("CountrySongViewModel", "Exception in fetchCountrySongs: ${e.message}")
+                Log.e(
+                    "CountrySongViewModel",
+                    "Exception in checkCountrySupportAndFetch: ${e.message}"
+                )
+                _uiState.value = CountrySongUiState.Error(e.message ?: "Unknown error")
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
+    private suspend fun fetchCountrySongs() {
+        try {
+            repository
+                .getCountrySongs()
+                .onSuccess { songs ->
+                    Log.d("CountrySongViewModel", "Fetched ${songs.size} songs")
+                    _countrySongs.value = songs
+                    _uiState.value = CountrySongUiState.Success(songs)
+                    viewModelScope.launch { checkDownloadedSongs(songs) }
+                }
+                .onFailure { error ->
+                    val errorMessage = error.message ?: "Unknown error"
+                    Log.e("CountrySongViewModel", "Error fetching songs: $errorMessage")
+                    _uiState.value = CountrySongUiState.Error(errorMessage)
+                }
+        } catch (e: Exception) {
+            Log.e("CountrySongViewModel", "Exception in fetchCountrySongs: ${e.message}")
+            _uiState.value = CountrySongUiState.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    fun retry() {
+        checkCountrySupportAndFetch()
+    }
+
+    fun getSupportedCountries(): Set<String> = repository.getSupportedCountries()
+
+    private suspend fun checkDownloadedSongs(songs: List<CountrySong>) {
+        val downloadedIds = mutableSetOf<Int>()
+        songs.forEach { song ->
+            if (repository.isSongDownloaded(song.id)) {
+                downloadedIds.add(song.id)
+            }
+        }
+        _downloadedSongs.value = downloadedIds
+    }
+
     fun downloadSong(song: CountrySong, context: Context) {
         viewModelScope.launch {
             try {
-                _downloadProgress.value = _downloadProgress.value + (song.id.toString() to 0.1f)
-                
-                for (i in 1..10) {
-                    delay(200)
-                    val progress = i / 10f
-                    _downloadProgress.value = _downloadProgress.value + (song.id.toString() to progress)
-                }
+                // Initialize progress
+                _downloadProgress.value =
+                    _downloadProgress.value + (song.id.toString() to 0f)
 
-                _downloadProgress.value = _downloadProgress.value - song.id.toString()
- 
-                Log.d("CountrySongViewModel", "Download completed for: ${song.title}")
-                
+                repository.downloadSong(
+                    song = song,
+                    onProgress = { progress ->
+                        _downloadProgress.value =
+                            _downloadProgress.value + (song.id.toString() to progress)
+                    },
+                    onComplete = { downloadedSong ->
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _downloadProgress.value =
+                                _downloadProgress.value - song.id.toString()
+                            // Update downloaded songs set
+                            _downloadedSongs.value = _downloadedSongs.value + song.id
+                            Toast.makeText(
+                                    context,
+                                    "Download complete: ${song.title}",
+                                    Toast.LENGTH_SHORT
+                                )
+                                .show()
+                        }
+                    }
+                )
             } catch (e: Exception) {
-                Log.e("CountrySongViewModel", "Download failed: ${e.message}")
-                // Remove from progress map on error
-                _downloadProgress.value = _downloadProgress.value - song.id.toString()
+                viewModelScope.launch(Dispatchers.Main) {
+                    _downloadProgress.value =
+                        _downloadProgress.value - song.id.toString()
+                    Toast.makeText(
+                            context,
+                            "Download failed: ${e.message}",
+                            Toast.LENGTH_LONG
+                        )
+                        .show()
+                }
             }
         }
     }
 
     companion object {
-        fun provideFactory(repository: CountrySongRepository): ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                CountrySongViewModel(repository)
-            }
-        }
+        fun provideFactory(repository: CountrySongRepository): ViewModelProvider.Factory =
+            viewModelFactory { initializer { CountrySongViewModel(repository) } }
     }
 }
