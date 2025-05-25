@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.purrytify.mobile.api.ProfileResponse
 import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
+import com.purrytify.mobile.utils.LocationService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -33,7 +34,8 @@ sealed class EditProfileState {
 // --- ViewModel ---
 class ProfileViewModel(
     private val authRepository: AuthRepository,
-    private val networkObserver: NetworkConnectivityObserver // Add this parameter
+    private val networkObserver: NetworkConnectivityObserver,
+    private val locationService: LocationService
 ) : ViewModel() {
 
     private val _profileUiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Initial)
@@ -110,17 +112,51 @@ class ProfileViewModel(
             }
         }
     }
+    
+    fun editProfileWithAutoLocation(profilePhoto: File?) {
+        if (!networkObserver.isNetworkAvailable()) {
+            _editProfileState.value = EditProfileState.Error("No network connection")
+            return
+        }
+
+        viewModelScope.launch {
+            _editProfileState.value = EditProfileState.Loading
+            try {
+                // Get current location country code
+                val countryCode = locationService.getCurrentCountryCode()
+                if (countryCode == null) {
+                    _editProfileState.value = EditProfileState.Error("Unable to detect location. Please check location permissions.")
+                    return@launch
+                }
+                
+                val result = authRepository.editProfile(countryCode, profilePhoto)
+                result.onSuccess { profile ->
+                    _editProfileState.value = EditProfileState.Success
+                    _profileUiState.value = ProfileUiState.Success(profile)
+                }.onFailure { exception ->
+                    _editProfileState.value = EditProfileState.Error(exception.message ?: "Unknown error")
+                }
+            } catch (e: Exception) {
+                _editProfileState.value = EditProfileState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+    
+    fun hasLocationPermission(): Boolean {
+        return locationService.hasLocationPermission()
+    }
 }
 
 // --- ViewModel Factory ---
 class ProfileViewModelFactory(
     private val authRepository: AuthRepository,
-    private val networkObserver: NetworkConnectivityObserver
+    private val networkObserver: NetworkConnectivityObserver,
+    private val locationService: LocationService
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ProfileViewModel(authRepository, networkObserver) as T
+            return ProfileViewModel(authRepository, networkObserver, locationService) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

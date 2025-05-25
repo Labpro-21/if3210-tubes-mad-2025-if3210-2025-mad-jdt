@@ -82,4 +82,10 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.coil.compose)
     implementation("androidx.media:media:1.6.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+    
+    // OpenStreetMap for embedded map without API keys
+    implementation("org.osmdroid:osmdroid-android:6.1.17")
+    implementation("org.osmdroid:osmdroid-wms:6.1.17")
+    implementation("org.osmdroid:osmdroid-mapsforge:6.1.17")
 }

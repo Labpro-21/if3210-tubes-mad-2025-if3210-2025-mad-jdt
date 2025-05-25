@@ -1,5 +1,6 @@
 package com.purrytify.mobile.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,6 +60,8 @@ import coil.request.ImageRequest
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
+import com.purrytify.mobile.utils.LocationService
+import com.purrytify.mobile.ui.components.MapLocationPicker
 import com.purrytify.mobile.viewmodel.EditProfileState
 import com.purrytify.mobile.viewmodel.ProfileUiState
 import com.purrytify.mobile.viewmodel.ProfileViewModel
@@ -70,19 +75,20 @@ fun ProfileScreen(
     networkConnectivityObserver: NetworkConnectivityObserver,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
+    val locationService = remember { LocationService(context) }
     val profileViewModel: ProfileViewModel = viewModel(
-        factory = ProfileViewModelFactory(authRepository, networkConnectivityObserver)
+        factory = ProfileViewModelFactory(authRepository, networkConnectivityObserver, locationService)
     )
 
-    val context = LocalContext.current
     val profileState by profileViewModel.profileUiState.collectAsState()
     val editProfileState by profileViewModel.editProfileState.collectAsState()
-    val networkStatus by profileViewModel.networkStatus.collectAsState()
-
     var showEditSheet by remember { mutableStateOf(false) }
     var showImagePicker by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var currentLocation by remember { mutableStateOf<String?>(null) }
+    var showLocationPermissionDialog by remember { mutableStateOf(false) }
+    var showMapLocationPicker by remember { mutableStateOf(false) }
 
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -90,12 +96,33 @@ fun ProfileScreen(
         selectedImageUri = uri
     }
 
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success: Boolean ->
-        if (success) {
-            // The image has been saved to the Uri we provided
-            showImagePicker = false
+
+    
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineLocationGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseLocationGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        
+        if (fineLocationGranted || coarseLocationGranted) {
+            // Permission granted, proceed with location detection
+            selectedImageUri?.let { uri ->
+                val file = File(context.cacheDir, "profile_photo")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                profileViewModel.editProfileWithAutoLocation(file)
+            } ?: run {
+                profileViewModel.editProfileWithAutoLocation(null)
+            }
+        } else {
+            Toast.makeText(
+                context,
+                "Location permission is required to detect your country",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -268,7 +295,7 @@ fun ProfileScreen(
         if (showEditSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showEditSheet = false },
-                containerColor = Color(0xFF282828)
+                containerColor = Color(0xFF282828),
             ) {
                 Column(
                     modifier = Modifier
@@ -321,20 +348,139 @@ fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    OutlinedTextField(
-                        value = currentLocation ?: "",
-                        onValueChange = { currentLocation = it },
-                        label = { Text("Location") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF1DB954),
-                            unfocusedBorderColor = Color.Gray,
-                            focusedLabelColor = Color(0xFF1DB954),
-                            unfocusedLabelColor = Color.Gray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // Location options
+                    Column {
+                        Text(
+                            text = "Location Settings",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Current location display
+                        currentLocation?.let {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Color(0xFF1DB954).copy(alpha = 0.1f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Current Location",
+                                    tint = Color(0xFF1DB954),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Current: $it",
+                                    color = Color(0xFF1DB954),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        
+                        // Auto-detect option
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Color(0xFF404040),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    if (profileViewModel.hasLocationPermission()) {
+                                        selectedImageUri?.let { uri ->
+                                            val file = File(context.cacheDir, "profile_photo")
+                                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                                file.outputStream().use { output ->
+                                                    input.copyTo(output)
+                                                }
+                                            }
+                                            profileViewModel.editProfileWithAutoLocation(file)
+                                        } ?: run {
+                                            profileViewModel.editProfileWithAutoLocation(null)
+                                        }
+                                    } else {
+                                        locationPermissionLauncher.launch(
+                                            arrayOf(
+                                                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                                android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
+                                        )
+                                    }
+                                }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = "Auto-detect Location",
+                                tint = Color(0xFF1DB954),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Auto-detect Location",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Automatically detect your country",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Embedded Map option
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Color(0xFF404040),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    showMapLocationPicker = true
+                                }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Select on Map",
+                                tint = Color(0xFF1DB954),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Select on Map",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Choose location from interactive map",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
@@ -356,6 +502,7 @@ fun ProfileScreen(
 
                         Button(
                             onClick = {
+                                // Save only profile photo if changed, location is handled separately
                                 selectedImageUri?.let { uri ->
                                     val file = File(context.cacheDir, "profile_photo")
                                     context.contentResolver.openInputStream(uri)?.use { input ->
@@ -363,9 +510,10 @@ fun ProfileScreen(
                                             input.copyTo(output)
                                         }
                                     }
-                                    profileViewModel.editProfile(currentLocation, file)
+                                    profileViewModel.editProfile(null, file)
                                 } ?: run {
-                                    profileViewModel.editProfile(currentLocation, null)
+                                    // No changes to save
+                                    showEditSheet = false
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
@@ -379,7 +527,7 @@ fun ProfileScreen(
                                     modifier = Modifier.size(24.dp)
                                 )
                             } else {
-                                Text("Save")
+                                Text("Save Photo")
                             }
                         }
                     }
@@ -422,6 +570,64 @@ fun ProfileScreen(
                             Text("Take Photo", color = Color.White)
                         }
                     }
+                }
+            )
+        }
+        
+        if (showLocationPermissionDialog) {
+            AlertDialog(
+                onDismissRequest = { showLocationPermissionDialog = false },
+                title = { Text("Location Permission Required", color = Color.White) },
+                containerColor = Color(0xFF282828),
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showLocationPermissionDialog = false
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    ) {
+                        Text("Grant Permission", color = Color(0xFF1DB954))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLocationPermissionDialog = false }) {
+                        Text("Cancel", color = Color.Gray)
+                    }
+                },
+                text = {
+                    Text(
+                        "This app needs location permission to automatically detect your country code (ISO 3166-1 alpha-2 format) for your profile.",
+                        color = Color.White
+                    )
+                }
+            )
+        }
+
+        if (showMapLocationPicker) {
+            MapLocationPicker(
+                onLocationSelected = { countryCode ->
+                    // Save the selected location
+                    selectedImageUri?.let { uri ->
+                        val file = File(context.cacheDir, "profile_photo")
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        profileViewModel.editProfile(countryCode, file)
+                    } ?: run {
+                        profileViewModel.editProfile(countryCode, null)
+                    }
+                    
+                    showMapLocationPicker = false
+                },
+                onDismiss = {
+                    showMapLocationPicker = false
                 }
             )
         }
