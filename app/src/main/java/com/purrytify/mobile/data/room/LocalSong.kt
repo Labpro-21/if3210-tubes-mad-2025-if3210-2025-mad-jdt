@@ -9,9 +9,11 @@ data class LocalSong(
     val id: Long = 0,
     val title: String,
     val artist: String,
-    val duration: Long, // Duration in milliseconds
-    val filePath: String, // URI path to the audio file in external storage
-    val artworkPath: String?, // URI path to the artwork file in external storage
+    val duration: Long,
+    val filePath: String,
+    val artworkPath: String?,
     val isLiked: Boolean = false,
-    val dateAdded: Long = System.currentTimeMillis()
+    val isDownloaded: Boolean = false,
+    val dateAdded: Long = System.currentTimeMillis(),
+    val topSongId: Int? = null // Add this to track original TopSong ID
 )

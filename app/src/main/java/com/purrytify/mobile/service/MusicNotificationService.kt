@@ -5,7 +5,6 @@ import android.content.*
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.media.MediaPlayer
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -17,11 +16,12 @@ import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.purrytify.mobile.MainActivity
 import com.purrytify.mobile.R
+import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.data.room.TopSong
-import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.ui.MiniPlayerState
 import kotlinx.coroutines.*
+import com.purrytify.mobile.utils.ListeningTracker
 
 class MusicNotificationService : Service() {
 
@@ -80,9 +80,20 @@ class MusicNotificationService : Service() {
             if (player.isPlaying) {
                 player.pause()
                 MiniPlayerState.isPlaying = false
+                ListeningTracker.pauseListening()
             } else {
                 player.start()
                 MiniPlayerState.isPlaying = true
+                MiniPlayerState.currentSong?.let { song ->
+                    val localSong =
+                        when (song) {
+                            is LocalSong -> song
+                            is TopSong -> song.toLocalSong()
+                            is CountrySong -> song.toLocalSong()
+                            else -> return@let
+                        }
+                    ListeningTracker.resumeListening(localSong)
+                }
             }
         }
         showNotification()
@@ -94,7 +105,7 @@ class MusicNotificationService : Service() {
     }
 
     private fun playPrev() {
-        // belum implement queue  
+        // belum implement queue
         showNotification()
     }
 
@@ -109,7 +120,8 @@ class MusicNotificationService : Service() {
         MiniPlayerState.currentSong = null
         MiniPlayerState.currentPosition = 0
         MiniPlayerState.totalDuration = 0
-        
+
+        ListeningTracker.stopListening()
         stopForeground(true)
         stopSelf()
     }
@@ -153,20 +165,20 @@ class MusicNotificationService : Service() {
         )
 
         val playPauseIntent = PendingIntent.getService(
-            this, 1, Intent(this, javaClass).setAction(ACTION_PLAY_PAUSE), 
+            this, 1, Intent(this, javaClass).setAction(ACTION_PLAY_PAUSE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val nextIntent = PendingIntent.getService(
-            this, 2, Intent(this, javaClass).setAction(ACTION_NEXT), 
+            this, 2, Intent(this, javaClass).setAction(ACTION_NEXT),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val prevIntent = PendingIntent.getService(
-            this, 3, Intent(this, javaClass).setAction(ACTION_PREV), 
+            this, 3, Intent(this, javaClass).setAction(ACTION_PREV),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val stopIntent = PendingIntent.getService(
-            this, 4, Intent(this, javaClass).setAction(ACTION_STOP), 
+            this, 4, Intent(this, javaClass).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -190,7 +202,6 @@ class MusicNotificationService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(artist)
-            .setSubText(progressText)
             .setSmallIcon(R.drawable.splash_logo)
             .setContentIntent(openPlayerPendingIntent)
             .addAction(R.drawable.skip_previous, "Previous", prevIntent)
@@ -201,7 +212,7 @@ class MusicNotificationService : Service() {
             .setStyle(
                 MediaStyle()
                     .setShowActionsInCompactView(0, 1, 2)
-            )
+            .setSubText(progressText)
             .setProgress(100, progressPercentage, false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
@@ -214,7 +225,7 @@ class MusicNotificationService : Service() {
     }
 
     private fun loadArtworkAndUpdateNotification(
-        artworkPath: String?, 
+        artworkPath: String?,
         builder: NotificationCompat.Builder
     ) {
         if (artworkPath != null) {
@@ -256,8 +267,8 @@ class MusicNotificationService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, 
-                "Purrytify Music Player", 
+                CHANNEL_ID,
+                "Purrytify Music Player",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Music player controls and information"
@@ -273,6 +284,9 @@ class MusicNotificationService : Service() {
         notificationUpdateJob?.cancel()
         serviceScope.cancel()
         stopForeground(true)
+        MiniPlayerState.mediaPlayer?.stop()
+        MiniPlayerState.isPlaying = false
+        ListeningTracker.stopListening()
         super.onDestroy()
     }
 }

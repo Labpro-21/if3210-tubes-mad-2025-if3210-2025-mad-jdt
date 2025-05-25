@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberImagePainter
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.clip
@@ -41,6 +42,7 @@ import com.purrytify.mobile.data.SongRepository
 import com.purrytify.mobile.data.room.TopSong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.ui.playSong
+import com.purrytify.mobile.viewmodel.GlobalSongViewModel
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.produceState
 import androidx.navigation.NavHostController
@@ -118,44 +120,6 @@ fun GlobalSong(
             Text(text = "Puritify • Apr 2025 • 2h 55min", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
 
             Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween 
-            ) {
-                // Download button on the left
-                IconButton(
-                    onClick = { /* Download functionality */ },
-                    modifier = Modifier
-                        .size(56.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.download_for_offline_24),
-                        contentDescription = "Download",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-
-                // Play button on the right
-                IconButton(
-                    onClick = { /* Play functionality */ },
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color(0xFF1DB954), shape = CircleShape)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.play_arrow),
-                        contentDescription = "Play",
-                        tint = Color.Black,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // Daftar lagu
             LazyColumn {
@@ -163,7 +127,9 @@ fun GlobalSong(
                     SongItem(
                         index = index + 1,
                         song = song,
+                        viewModel = viewModel,
                         navController = navController
+
                     )
                 }
             }
@@ -175,9 +141,11 @@ fun GlobalSong(
 fun SongItem(
     index: Int,
     song: TopSong,
+    viewModel: GlobalSongViewModel,
     navController: NavController
 ) {
     val context = LocalContext.current
+    val downloadProgress: Map<String, Float> = viewModel.downloadProgress.collectAsState().value
     
     Row(
         modifier = Modifier
@@ -198,7 +166,6 @@ fun SongItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Add song artwork
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(song.artwork)
@@ -220,7 +187,30 @@ fun SongItem(
             Text(text = song.artist, fontSize = 14.sp, color = Color.Gray)
         }
 
-        // Add play button
+        // Download button
+        IconButton(
+            onClick = {
+                viewModel.downloadSong(song, context)
+            }
+        ) {
+            val progress = downloadProgress[song.id.toString()]
+            if (progress != null) {
+                CircularProgressIndicator(
+                    progress = progress,
+                    color = Color(0xFF1DB954),
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.download_for_offline_24),
+                    contentDescription = "Download",
+                    tint = Color(0xFF1DB954),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        // Play button
         IconButton(
             onClick = {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
