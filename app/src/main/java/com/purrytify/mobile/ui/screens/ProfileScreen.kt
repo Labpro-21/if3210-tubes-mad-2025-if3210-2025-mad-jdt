@@ -106,10 +106,8 @@ fun ProfileScreen(
                                 )
                 )
 
-        // Add LocalSongViewModel to get song statistics
         val localSongViewModel: LocalSongViewModel = viewModel()
 
-        // Create listening session repository for listening statistics
         val listeningSessionRepository = remember {
                 val database = AppDatabase.getDatabase(context)
                 ListeningSessionRepository(database.listeningSessionDao())
@@ -124,11 +122,9 @@ fun ProfileScreen(
         var showLocationPermissionDialog by remember { mutableStateOf(false) }
         var showMapLocationPicker by remember { mutableStateOf(false) }
 
-        // Collect real data from ViewModels
         val allSongs by localSongViewModel.allSongs.collectAsState()
         val likedSongs by localSongViewModel.likedSongs.collectAsState()
 
-        // State for listening statistics
         var totalListenedSongs by remember { mutableStateOf(0) }
 
         val pickImageLauncher =
@@ -148,7 +144,7 @@ fun ProfileScreen(
                                         ?: false
 
                         if (fineLocationGranted || coarseLocationGranted) {
-                                // Permission granted, proceed with location detection
+
                                 selectedImageUri?.let { uri ->
                                         val file = File(context.cacheDir, "profile_photo")
                                         context.contentResolver.openInputStream(uri)?.use { input ->
@@ -174,10 +170,8 @@ fun ProfileScreen(
         LaunchedEffect(Unit) {
                 profileViewModel.fetchProfile()
 
-                // Fetch listening statistics
                 try {
                         val sessions = listeningSessionRepository.allSessions.first()
-                        // Count unique songs that have been listened to
                         totalListenedSongs = sessions.distinctBy { it.songId }.size
                 } catch (e: Exception) {
                         android.util.Log.e("ProfileScreen", "Error fetching listening stats", e)
@@ -406,7 +400,6 @@ fun ProfileScreen(
                                                                                 )
                                                                 )
 
-                                                                // Sound Capsule Section
                                                                 SoundCapsuleSection(
                                                                         navController =
                                                                                 navController
@@ -498,7 +491,6 @@ fun ProfileScreen(
 
                                         Spacer(modifier = Modifier.height(24.dp))
 
-                                        // Current/Preview Image
                                         AsyncImage(
                                                 model =
                                                         ImageRequest.Builder(LocalContext.current)
@@ -548,7 +540,6 @@ fun ProfileScreen(
 
                                         Spacer(modifier = Modifier.height(24.dp))
 
-                                        // Location options
                                         Column {
                                                 Text(
                                                         text = "Location Settings",
@@ -559,7 +550,6 @@ fun ProfileScreen(
 
                                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                                // Current location display
                                                 currentLocation?.let {
                                                         Row(
                                                                 modifier =
@@ -605,7 +595,6 @@ fun ProfileScreen(
                                                         Spacer(modifier = Modifier.height(12.dp))
                                                 }
 
-                                                // Auto-detect option
                                                 Row(
                                                         modifier =
                                                                 Modifier.fillMaxWidth()
@@ -702,7 +691,6 @@ fun ProfileScreen(
 
                                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                                // Embedded Map option
                                                 Row(
                                                         modifier =
                                                                 Modifier.fillMaxWidth()
@@ -767,9 +755,6 @@ fun ProfileScreen(
 
                                                 Button(
                                                         onClick = {
-                                                                // Save only profile photo if
-                                                                // changed, location is handled
-                                                                // separately
                                                                 selectedImageUri?.let { uri ->
                                                                         val file =
                                                                                 File(
@@ -797,8 +782,6 @@ fun ProfileScreen(
                                                                                 )
                                                                 }
                                                                         ?: run {
-                                                                                // No changes to
-                                                                                // save
                                                                                 showEditSheet =
                                                                                         false
                                                                         }
@@ -855,14 +838,7 @@ fun ProfileScreen(
                                                         )
                                                 }
                                                 TextButton(
-                                                        onClick = {
-                                                                // Implementation for camera capture
-                                                                // would go here
-                                                                // This requires additional setup
-                                                                // for camera permissions and
-                                                                // file provider
-                                                                showImagePicker = false
-                                                        },
+                                                        onClick = { showImagePicker = false },
                                                         modifier = Modifier.fillMaxWidth()
                                                 ) { Text("Take Photo", color = Color.White) }
                                         }
@@ -1044,7 +1020,6 @@ fun SoundCapsuleSection(navController: NavController) {
                 }
         }
 
-        // Export options dialog
         if (showExportDialog) {
                 AlertDialog(
                         onDismissRequest = { showExportDialog = false },
@@ -1135,7 +1110,6 @@ fun SoundCapsuleMonthSection(
                                 .background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp))
                                 .padding(20.dp)
         ) {
-                // Month header with share icon
                 Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1159,7 +1133,6 @@ fun SoundCapsuleMonthSection(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Time listened - prominent display
                 Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -1196,12 +1169,10 @@ fun SoundCapsuleMonthSection(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Top artist and song cards
                 Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                        // Top artist card
                         Box(
                                 modifier =
                                         Modifier.weight(1f)
@@ -1235,7 +1206,6 @@ fun SoundCapsuleMonthSection(
 
                                         Spacer(modifier = Modifier.height(16.dp))
 
-                                        // Artist image - larger and centered
                                         AsyncImage(
                                                 model =
                                                         ImageRequest.Builder(LocalContext.current)
@@ -1277,7 +1247,6 @@ fun SoundCapsuleMonthSection(
                                 }
                         }
 
-                        // Top song card
                         Box(
                                 modifier =
                                         Modifier.weight(1f)
@@ -1312,7 +1281,6 @@ fun SoundCapsuleMonthSection(
                                         Spacer(modifier = Modifier.height(16.dp))
 
                                         Log.d("topSongImageUrl", topSongImageUrl.toString())
-                                        // Song image - larger and centered
                                         AsyncImage(
                                                 model =
                                                         ImageRequest.Builder(LocalContext.current)
@@ -1355,7 +1323,6 @@ fun SoundCapsuleMonthSection(
                         }
                 }
 
-                // Achievement card (only for April)
                 achievementText?.let {
                         Spacer(modifier = Modifier.height(24.dp))
                         Box(

@@ -57,16 +57,14 @@ import com.purrytify.mobile.viewmodel.LoginViewModelFactory
 
 @Composable
 fun LoginScreen(
-    authRepository: AuthRepository, // Pass repository for factory
-    navController: NavHostController // Pass NavController for navigation
+        authRepository: AuthRepository, // Pass repository for factory
+        navController: NavHostController // Pass NavController for navigation
 ) {
     Log.d("LoginScreen", "LoginScreen Composable is rendered")
     val context = LocalContext.current
 
     // Use viewModel() with the factory to get a stable ViewModel instance
-    val loginViewModel: LoginViewModel = viewModel(
-        factory = LoginViewModelFactory(authRepository)
-    )
+    val loginViewModel: LoginViewModel = viewModel(factory = LoginViewModelFactory(authRepository))
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -85,215 +83,194 @@ fun LoginScreen(
             if (successState.isLoggedIn) {
                 Log.d("LoginScreen", "Login Success, navigating to main graph")
                 // Start the background service
-                val serviceIntent = android.content.Intent(
-                    context,
-                    com.purrytify.mobile.background.TokenExpirationService::class.java
-                )
+                val serviceIntent =
+                        android.content.Intent(
+                                context,
+                                com.purrytify.mobile.background.TokenExpirationService::class.java
+                        )
                 context.startService(serviceIntent)
                 // Navigate to main graph, clearing the auth stack
                 navController.navigate("main") {
                     popUpTo("auth") { inclusive = true }
                     launchSingleTop = true
                 }
-                // Optional: Reset ViewModel state after successful navigation
-                // loginViewModel.resetState()
             } else {
-                // Handle case where Success is false (if possible in your logic)
                 Log.w(
-                    "LoginScreen",
-                    "LoginUiState is Success(false), login failed but no exception. Not navigating."
+                        "LoginScreen",
+                        "LoginUiState is Success(false), login failed but no exception. Not navigating."
                 )
             }
         }
     }
 
-    // Reset state when LoginScreen leaves composition (optional but good practice)
-    DisposableEffect(Unit) {
-        onDispose {
-            // loginViewModel.resetState() // Uncomment if you want state reset on leaving
-        }
-    }
+    DisposableEffect(Unit) { onDispose {} }
 
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-    ) {
-        // Background Image Box
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 500.dp) // Adjust as needed
-
-        ) {
+    Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
+        Box(modifier = Modifier.fillMaxSize().padding(bottom = 500.dp)) {
             Image(
-                painter = painterResource(id = R.drawable.background_login),
-                contentDescription = "Album covers background",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                    painter = painterResource(id = R.drawable.background_login),
+                    contentDescription = "Album covers background",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
             )
         }
 
         // Main Content Column
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(vertical = 50.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Bottom // Arrange from bottom up
+                modifier =
+                        Modifier.fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .padding(vertical = 50.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom
         ) {
-            // Logo and Title Section
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(modifier = Modifier.height(100.dp)) // Adjust spacing
+                Spacer(modifier = Modifier.height(100.dp))
 
-                Box(
-                    modifier = Modifier
-                        .size(130.dp, 130.dp)
-                        .background(backgroundColor)
-                ) {
+                Box(modifier = Modifier.size(130.dp, 130.dp).background(backgroundColor)) {
                     Image(
-                        painter = painterResource(id = R.drawable.splash_logo),
-                        contentDescription = "Purritify Logo",
-                        modifier = Modifier.size(130.dp)
+                            painter = painterResource(id = R.drawable.splash_logo),
+                            contentDescription = "Purritify Logo",
+                            modifier = Modifier.size(130.dp)
                     )
                 }
 
                 Text(
-                    text = "Millions of Songs.\nOnly on Purritify.",
-                    style = TextStyle(
-                        fontSize = 24.sp,
-                        color = Color.White,
-                        fontFamily = LocalPoppinsFont.current,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    ),
-                    modifier = Modifier.padding(vertical = 15.dp)
+                        text = "Millions of Songs.\nOnly on Purritify.",
+                        style =
+                                TextStyle(
+                                        fontSize = 24.sp,
+                                        color = Color.White,
+                                        fontFamily = LocalPoppinsFont.current,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                ),
+                        modifier = Modifier.padding(vertical = 15.dp)
                 )
             }
 
-
-            // Input Fields Section
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Email",
-                    style = TextStyle(
-                        fontSize = 14.sp,
-                        color = Color.White,
-                        fontFamily = LocalPoppinsFont.current
-                    ),
-                    modifier = Modifier
-                        .align(Alignment.Start)
-                        .padding(bottom = 8.dp)
+                        text = "Email",
+                        style =
+                                TextStyle(
+                                        fontSize = 14.sp,
+                                        color = Color.White,
+                                        fontFamily = LocalPoppinsFont.current
+                                ),
+                        modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
                 )
 
                 TextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    placeholder = { Text("Enter your email") },
-                    colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.DarkGray.copy(alpha = 0.3f),
-                        focusedContainerColor = Color.DarkGray.copy(alpha = 0.5f),
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        unfocusedPlaceholderColor = Color.LightGray,
-                        focusedPlaceholderColor = Color.LightGray,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    singleLine = true,
-                    textStyle = TextStyle(fontFamily = LocalPoppinsFont.current)
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = { Text("Enter your email") },
+                        colors =
+                                TextFieldDefaults.colors(
+                                        unfocusedContainerColor = Color.DarkGray.copy(alpha = 0.3f),
+                                        focusedContainerColor = Color.DarkGray.copy(alpha = 0.5f),
+                                        unfocusedTextColor = Color.White,
+                                        focusedTextColor = Color.White,
+                                        cursorColor = Color.White,
+                                        unfocusedPlaceholderColor = Color.LightGray,
+                                        focusedPlaceholderColor = Color.LightGray,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        disabledIndicatorColor = Color.Transparent,
+                                        errorIndicatorColor = Color.Transparent
+                                ),
+                        modifier =
+                                Modifier.fillMaxWidth()
+                                        .height(56.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                        singleLine = true,
+                        textStyle = TextStyle(fontFamily = LocalPoppinsFont.current)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Password",
-                    style = TextStyle(
-                        fontSize = 14.sp,
-                        color = Color.White,
-                        fontFamily = LocalPoppinsFont.current
-                    ),
-                    modifier = Modifier
-                        .align(Alignment.Start)
-                        .padding(bottom = 8.dp)
+                        text = "Password",
+                        style =
+                                TextStyle(
+                                        fontSize = 14.sp,
+                                        color = Color.White,
+                                        fontFamily = LocalPoppinsFont.current
+                                ),
+                        modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
                 )
 
                 TextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    placeholder = { Text("Enter your password") },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.DarkGray.copy(alpha = 0.3f),
-                        focusedContainerColor = Color.DarkGray.copy(alpha = 0.5f),
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        unfocusedPlaceholderColor = Color.LightGray,
-                        focusedPlaceholderColor = Color.LightGray,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                tint = Color.LightGray
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    singleLine = true,
-                    textStyle = TextStyle(fontFamily = LocalPoppinsFont.current)
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = { Text("Enter your password") },
+                        visualTransformation =
+                                if (passwordVisible) VisualTransformation.None
+                                else PasswordVisualTransformation(),
+                        colors =
+                                TextFieldDefaults.colors(
+                                        unfocusedContainerColor = Color.DarkGray.copy(alpha = 0.3f),
+                                        focusedContainerColor = Color.DarkGray.copy(alpha = 0.5f),
+                                        unfocusedTextColor = Color.White,
+                                        focusedTextColor = Color.White,
+                                        cursorColor = Color.White,
+                                        unfocusedPlaceholderColor = Color.LightGray,
+                                        focusedPlaceholderColor = Color.LightGray,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        disabledIndicatorColor = Color.Transparent,
+                                        errorIndicatorColor = Color.Transparent
+                                ),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                        imageVector =
+                                                if (passwordVisible) Icons.Filled.Visibility
+                                                else Icons.Filled.VisibilityOff,
+                                        contentDescription =
+                                                if (passwordVisible) "Hide password"
+                                                else "Show password",
+                                        tint = Color.LightGray
+                                )
+                            }
+                        },
+                        modifier =
+                                Modifier.fillMaxWidth()
+                                        .height(56.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                        singleLine = true,
+                        textStyle = TextStyle(fontFamily = LocalPoppinsFont.current)
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Login Button and Status Section
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Display Loading or Error Message
                 Box(modifier = Modifier.height(40.dp), contentAlignment = Alignment.Center) {
                     when (val uiState = loginUiState) {
                         is LoginUiState.Loading -> {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = loginbuttonColor,
-                                strokeWidth = 3.dp
+                                    modifier = Modifier.size(24.dp),
+                                    color = loginbuttonColor,
+                                    strokeWidth = 3.dp
                             )
                         }
-
                         is LoginUiState.Error -> {
                             Text(
-                                text = uiState.message,
-                                color = Color.Red,
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                    text = uiState.message,
+                                    color = Color.Red,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
-                        // Initial and Success states don't need specific UI here
                         else -> {}
                     }
                 }
@@ -301,36 +278,37 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = {
-                        Log.d("LoginScreen", "Login button clicked")
-                        if (email.isNotBlank() && password.isNotBlank()) {
-                            loginViewModel.login(email, password)
-                        } else {
-                            Log.w("LoginScreen", "Email or password is blank")
-                            // Optionally show a snackbar or message
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = loginbuttonColor,
-                        contentColor = Color.Black
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(50.dp)),
-                    enabled = loginUiState !is LoginUiState.Loading // Disable while loading
+                        onClick = {
+                            Log.d("LoginScreen", "Login button clicked")
+                            if (email.isNotBlank() && password.isNotBlank()) {
+                                loginViewModel.login(email, password)
+                            } else {
+                                Log.w("LoginScreen", "Email or password is blank")
+                            }
+                        },
+                        colors =
+                                ButtonDefaults.buttonColors(
+                                        containerColor = loginbuttonColor,
+                                        contentColor = Color.Black
+                                ),
+                        modifier =
+                                Modifier.fillMaxWidth()
+                                        .height(50.dp)
+                                        .clip(RoundedCornerShape(50.dp)),
+                        enabled = loginUiState !is LoginUiState.Loading
                 ) {
                     Text(
-                        text = "Log In",
-                        style = TextStyle(
-                            fontSize = 16.sp,
-                            fontFamily = LocalPoppinsFont.current,
-                            fontWeight = FontWeight.Bold
-                        )
+                            text = "Log In",
+                            style =
+                                    TextStyle(
+                                            fontSize = 16.sp,
+                                            fontFamily = LocalPoppinsFont.current,
+                                            fontWeight = FontWeight.Bold
+                                    )
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(50.dp)) // Bottom padding
+            Spacer(modifier = Modifier.height(50.dp))
         }
     }
 }

@@ -26,8 +26,4 @@ class LocalSongRepository(private val localSongDao: LocalSongDao) {
     suspend fun getSongById(songId: Long): LocalSong? {
         return localSongDao.getSongById(songId)
     }
-
-    // fun getDownloadedSongs(): Flow<List<LocalSong>> {
-    //     return localSongDao.getDownloadedSongs()
-    // }
 }

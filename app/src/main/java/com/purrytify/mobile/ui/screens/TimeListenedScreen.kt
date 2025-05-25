@@ -78,7 +78,6 @@ fun TimeListenedScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Main listening time display
                 Text(
                         text = "You listened to music for",
                         color = Color.White,
@@ -113,7 +112,6 @@ fun TimeListenedScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Daily average
                 Text(
                         text = "Daily average: $dailyAverage min",
                         color = Color.White.copy(alpha = 0.7f),
@@ -122,7 +120,6 @@ fun TimeListenedScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Chart section
                 if (isLoading) {
                     Box(
                             modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -132,7 +129,7 @@ fun TimeListenedScreen(navController: NavController) {
                     DailyChart(viewModel = viewModel)
                 }
 
-                Spacer(modifier = Modifier.height(100.dp)) // Bottom padding for mini player
+                Spacer(modifier = Modifier.height(100.dp))
             }
         }
     }

@@ -44,17 +44,14 @@ fun MapLocationPicker(
     var isLoading by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Validate if the selected country code is valid and not empty
     val isValidSelection =
             selectedCountryCode?.let { code ->
                 code.isNotBlank() && code.length == 2 && code.all { it.isLetter() }
             }
                     ?: false
 
-    // Check icon should only be enabled when we have a valid selection and not loading
     val isCheckEnabled = isValidSelection && !isLoading
 
-    // Initialize OSMDroid configuration
     LaunchedEffect(Unit) {
         Configuration.getInstance()
                 .load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
@@ -67,7 +64,6 @@ fun MapLocationPicker(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF282828))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
             Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -119,7 +115,6 @@ fun MapLocationPicker(
                 }
             }
 
-            // Selected location info
             if (isValidSelection) {
                 selectedCountryCode?.let { countryCode ->
                     Card(
@@ -141,7 +136,6 @@ fun MapLocationPicker(
                 }
             }
 
-            // Loading indicator
             if (isLoading) {
                 Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -158,7 +152,6 @@ fun MapLocationPicker(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Error message if location was selected but country code is invalid
             if (selectedLocation != null && !isLoading && !isValidSelection) {
                 Card(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -178,7 +171,6 @@ fun MapLocationPicker(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Instructions
             Text(
                     text = "Tap on the map to select your location",
                     color = Color.Gray,
@@ -188,20 +180,17 @@ fun MapLocationPicker(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Map
             AndroidView(
                     factory = { ctx ->
                         MapView(ctx).apply {
                             setTileSource(TileSourceFactory.MAPNIK)
                             setMultiTouchControls(true)
 
-                            // Set initial position (Jakarta, Indonesia as default)
                             val mapController: IMapController = controller
                             mapController.setZoom(5.0)
                             val startPoint = GeoPoint(-6.2088, 106.8456) // Jakarta
                             mapController.setCenter(startPoint)
 
-                            // Add map events overlay for tap handling
                             val mapEventsReceiver =
                                     object : MapEventsReceiver {
                                         override fun singleTapConfirmedHelper(
@@ -214,10 +203,8 @@ fun MapLocationPicker(
                                                 )
                                                 selectedLocation = geoPoint
 
-                                                // Clear existing markers
                                                 overlays.removeAll { it is Marker }
 
-                                                // Add new marker
                                                 val marker = Marker(this@apply)
                                                 marker.position = geoPoint
                                                 marker.setAnchor(
@@ -227,10 +214,8 @@ fun MapLocationPicker(
                                                 marker.title = "Selected Location"
                                                 overlays.add(marker)
 
-                                                // Reset country code and start loading
                                                 selectedCountryCode = null
 
-                                                // Get country code from coordinates
                                                 coroutineScope.launch {
                                                     isLoading = true
                                                     try {
@@ -288,17 +273,12 @@ private suspend fun getCountryCodeFromCoordinates(context: Context, geoPoint: Ge
             try {
                 val geocoder = Geocoder(context, Locale.getDefault())
 
-                // Check if geocoder is available
                 if (!Geocoder.isPresent()) {
                     Log.e("MapLocationPicker", "Geocoder is not available on this device")
                     return@withContext null
                 }
 
-                // Use the newer API if available (API 33+)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                    // For newer API, we would use the callback-based approach
-                    // But for simplicity, we'll stick with the older approach for now
-                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {}
 
                 @Suppress("DEPRECATION")
                 val addresses = geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1)
@@ -307,7 +287,6 @@ private suspend fun getCountryCodeFromCoordinates(context: Context, geoPoint: Ge
                     val address = addresses[0]
                     val countryCode = address.countryCode
 
-                    // Validate country code format
                     if (countryCode != null &&
                                     countryCode.length == 2 &&
                                     countryCode.all { it.isLetter() }

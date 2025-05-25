@@ -19,7 +19,7 @@ class ListeningSessionRepository(private val listeningSessionDao: ListeningSessi
             endTime: Long
     ) {
         val duration = endTime - startTime
-        if (duration > 0) { // Only record if there was actual listening time
+        if (duration > 0) {
             val calendar = Calendar.getInstance()
             calendar.timeInMillis = startTime
 
@@ -31,7 +31,7 @@ class ListeningSessionRepository(private val listeningSessionDao: ListeningSessi
                             startTime = startTime,
                             endTime = endTime,
                             duration = duration,
-                            month = calendar.get(Calendar.MONTH) + 1, // Calendar.MONTH is 0-based
+                            month = calendar.get(Calendar.MONTH) + 1,
                             year = calendar.get(Calendar.YEAR)
                     )
 
@@ -71,7 +71,6 @@ class ListeningSessionRepository(private val listeningSessionDao: ListeningSessi
         return listeningSessionDao.getDailyListeningTimeForMonth(month, year)
     }
 
-    // Helper function to format milliseconds to readable time
     fun formatListeningTime(milliseconds: Long): String {
         val totalMinutes = milliseconds / (1000 * 60)
         return if (totalMinutes < 60) {

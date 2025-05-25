@@ -9,8 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// --- UI State ---
-// Keep this definition accessible, maybe move to its own file or keep here
 sealed class LoginUiState {
     object Initial : LoginUiState()
     object Loading : LoginUiState()
@@ -18,10 +16,7 @@ sealed class LoginUiState {
     data class Error(val message: String) : LoginUiState()
 }
 
-// --- ViewModel ---
-class LoginViewModel(
-    private val authRepository: AuthRepository
-) : ViewModel() {
+class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     private val _loginUiState = MutableStateFlow<LoginUiState>(LoginUiState.Initial)
     val loginUiState: StateFlow<LoginUiState> = _loginUiState
@@ -36,23 +31,19 @@ class LoginViewModel(
                 _loginUiState.value = LoginUiState.Success(isLoggedIn)
             } catch (e: Exception) {
                 Log.e("LoginViewModel", "Exception during login: ${e.message}", e)
-                _loginUiState.value = LoginUiState.Error(
-                    "Login failed: ${e.message ?: "Unknown error"}"
-                )
+                _loginUiState.value =
+                        LoginUiState.Error("Login failed: ${e.message ?: "Unknown error"}")
             }
         }
     }
 
-    // Optional: Function to reset state if needed when screen is left
     fun resetState() {
         _loginUiState.value = LoginUiState.Initial
     }
 }
 
-// --- ViewModel Factory ---
-// Keep this factory definition accessible, maybe move to its own file or keep here
 class LoginViewModelFactory(private val authRepository: AuthRepository) :
-    ViewModelProvider.Factory {
+        ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LoginViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST") // Necessary cast

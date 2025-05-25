@@ -60,15 +60,13 @@ import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.MiniPlayer
 import com.purrytify.mobile.ui.ScanQrScreen
 import com.purrytify.mobile.ui.initializeMediaPlayer
+import com.purrytify.mobile.ui.playSong
 import com.purrytify.mobile.ui.screens.CountrySong
 import com.purrytify.mobile.ui.screens.GlobalSong
-import com.purrytify.mobile.ui.screens.RecommendationSong
-import com.purrytify.mobile.ui.playSong
-import com.purrytify.mobile.ui.screens.CountrySong 
-import com.purrytify.mobile.ui.screens.GlobalSong 
 import com.purrytify.mobile.ui.screens.HomeScreen
 import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
+import com.purrytify.mobile.ui.screens.RecommendationSong
 import com.purrytify.mobile.ui.screens.SplashScreen
 import com.purrytify.mobile.ui.screens.TimeListenedScreen
 import com.purrytify.mobile.ui.screens.TopArtistsScreen
@@ -80,26 +78,22 @@ import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-
-// Composition Local for Poppins Font
 val LocalPoppinsFont =
-    staticCompositionLocalOf<FontFamily> {
-        error("Poppins font family not provided")
-    }
+        staticCompositionLocalOf<FontFamily> { error("Poppins font family not provided") }
 
 class MainActivity : ComponentActivity() {
 
     private var navController: NavHostController? = null
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Log.d("MainActivity", "Notification permission granted")
-        } else {
-            Log.d("MainActivity", "Notification permission denied")
-        }
-    }
+    private val requestPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+                    isGranted: Boolean ->
+                if (isGranted) {
+                    Log.d("MainActivity", "Notification permission granted")
+                } else {
+                    Log.d("MainActivity", "Notification permission denied")
+                }
+            }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
@@ -111,59 +105,43 @@ class MainActivity : ComponentActivity() {
         handleDeepLink(intent)
         Log.d("MainActivity", "onCreate: MainActivity is starting!")
 
-        // Handle logout intent
         if (intent?.getBooleanExtra("isLogout", false) == true) {
             Log.d("MainActivity", "Received logout intent, clearing tokens")
-            // Clear tokens synchronously to ensure they're cleared before UI setup
             TokenManager(applicationContext).clearTokensSync()
         }
 
         enableEdgeToEdge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                            PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissionLauncher.launch(
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
-        // --- Dependencies ---
         val tokenManager = TokenManager(applicationContext)
-
-        // Create logout callback that restarts MainActivity with logout flag
         val onLogoutRequired = {
-            Log.d(
-                "MainActivity",
-                "Logout required from interceptor, restarting activity"
-            )
+            Log.d("MainActivity", "Logout required from interceptor, restarting activity")
             val intent =
-                Intent(this, MainActivity::class.java).apply {
-                    flags =
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    putExtra("isLogout", true)
-                }
+                    Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        putExtra("isLogout", true)
+                    }
             startActivity(intent)
             finish()
         }
 
         val retrofit =
-            ApiClient.buildRetrofit(
-                tokenManager,
-                onLogoutRequired
-            ) // Pass tokenManager and logout callback
+                ApiClient.buildRetrofit(
+                        tokenManager,
+                        onLogoutRequired
+                ) // Pass tokenManager and logout callback
         val authService = ApiClient.createAuthService(retrofit)
         val userService = ApiClient.createUserService(retrofit)
         val authRepository = AuthRepository(tokenManager, authService)
         val userRepository = UserRepository(tokenManager, userService)
-        val networkConnectivityObserver =
-            NetworkConnectivityObserver(applicationContext)
-        // --- End Dependencies ---
+        val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext)
 
         setContent {
             Log.d("MainActivity", "setContent: Setting up Main UI")
@@ -175,109 +153,79 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(Unit) {
                         val data = intent?.data
-                        if (data != null &&
-                            data.scheme == "purrytify" &&
-                            data.host == "song"
-                        ) {
+                        if (data != null && data.scheme == "purrytify" && data.host == "song") {
                             val songId = data.lastPathSegment?.toIntOrNull()
                             val type = data.getQueryParameter("type")
                             if (songId != null) {
                                 if (type == "country") {
-                                    navController.navigate(
-                                        "country_song_player/$songId"
-                                    )
+                                    navController.navigate("country_song_player/$songId")
                                 } else {
-                                    navController.navigate(
-                                        "global_song_player/$songId"
-                                    )
+                                    navController.navigate("global_song_player/$songId")
                                 }
                             }
                         }
                     }
 
                     val startDestination = remember {
-                        if (checkInitialAuthState(tokenManager)) "main"
-                        else "auth"
+                        if (checkInitialAuthState(tokenManager)) "main" else "auth"
                     }
-                    Log.d(
-                        "MainActivity",
-                        "Initial start destination: $startDestination"
-                    )
+                    Log.d("MainActivity", "Initial start destination: $startDestination")
 
-                    NavHost(
-                        navController = navController,
-                        startDestination = startDestination
-                    ) {
-                        // Authentication Flow Graph
+                    NavHost(navController = navController, startDestination = startDestination) {
                         navigation(startDestination = "splash", route = "auth") {
                             composable("splash") {
                                 SplashScreen(
-                                    tokenManager = tokenManager,
-                                    authRepository = authRepository,
-                                    navController = navController
+                                        tokenManager = tokenManager,
+                                        authRepository = authRepository,
+                                        navController = navController
                                 )
                             }
                             composable("login") {
                                 Log.d("MainActivity", "Navigating to LoginScreen")
                                 LoginScreen(
-                                    authRepository = authRepository,
-                                    navController = navController
+                                        authRepository = authRepository,
+                                        navController = navController
                                 )
                             }
                         }
 
-                        // Main Application Flow Graph
                         composable("main") {
-                            Log.d(
-                                "MainActivity",
-                                "Navigating to MainContent (main graph)"
-                            )
+                            Log.d("MainActivity", "Navigating to MainContent (main graph)")
                             MainContent(
-                                navController = navController,
-                                authRepository = authRepository,
-                                userRepository = userRepository,
-                                networkConnectivityObserver =
-                                    networkConnectivityObserver,
-                                tokenManager = tokenManager // Pass tokenManager
+                                    navController = navController,
+                                    authRepository = authRepository,
+                                    userRepository = userRepository,
+                                    networkConnectivityObserver = networkConnectivityObserver,
+                                    tokenManager = tokenManager // Pass tokenManager
                             )
                         }
 
                         composable(
-                            route = "global_song_player/{songId}",
-                            arguments =
-                                listOf(
-                                    navArgument("songId") {
-                                        type = NavType.IntType
-                                    }
-                                )
+                                route = "global_song_player/{songId}",
+                                arguments = listOf(navArgument("songId") { type = NavType.IntType })
                         ) { navBackStackEntry ->
-                            val songId =
-                                navBackStackEntry.arguments?.getInt("songId")
+                            val songId = navBackStackEntry.arguments?.getInt("songId")
                             if (songId != null) {
-                                val songRepository = remember {
-                                    createSongRepository(tokenManager)
-                                }
+                                val songRepository = remember { createSongRepository(tokenManager) }
                                 val context = LocalContext.current
-                                val song by produceState<TopSong?>(
-                                    initialValue = null,
-                                    songId
-                                ) {
-                                    Log.d(
-                                        "MiniPlayer",
-                                        "produceState: fetching songId=$songId"
-                                    )
-                                    value = songRepository.getSongById(songId)
-                                    Log.d(
-                                        "MiniPlayer",
-                                        "produceState: result=${value?.title}"
-                                    )
-                                }
+                                val song by
+                                        produceState<TopSong?>(initialValue = null, songId) {
+                                            Log.d(
+                                                    "MiniPlayer",
+                                                    "produceState: fetching songId=$songId"
+                                            )
+                                            value = songRepository.getSongById(songId)
+                                            Log.d(
+                                                    "MiniPlayer",
+                                                    "produceState: result=${value?.title}"
+                                            )
+                                        }
 
                                 LaunchedEffect(song) {
                                     if (song != null) {
                                         Log.d(
-                                            "MiniPlayer",
-                                            "LaunchedEffect song type: ${song!!::class.simpleName}"
+                                                "MiniPlayer",
+                                                "LaunchedEffect song type: ${song!!::class.simpleName}"
                                         )
                                         playSong(song!!, context)
                                         navController.navigate("main") {
@@ -290,60 +238,47 @@ class MainActivity : ComponentActivity() {
 
                                 if (song != null) {
                                     GlobalSongPlayer(
-                                        navController = navController,
-                                        repository = songRepository,
-                                        songId = songId
+                                            navController = navController,
+                                            repository = songRepository,
+                                            songId = songId
                                     )
                                 } else {
                                     Box(
-                                        Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator()
-                                    }
+                                            Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                    ) { CircularProgressIndicator() }
                                 }
                             }
                         }
 
                         composable(
-                            route = "country_song_player/{songId}",
-                            arguments =
-                                listOf(
-                                    navArgument("songId") {
-                                        type = NavType.IntType
-                                    }
-                                )
+                                route = "country_song_player/{songId}",
+                                arguments = listOf(navArgument("songId") { type = NavType.IntType })
                         ) { navBackStackEntry ->
-                            val songId =
-                                navBackStackEntry.arguments?.getInt("songId")
+                            val songId = navBackStackEntry.arguments?.getInt("songId")
                             if (songId != null) {
                                 val countrySongRepository = remember {
                                     createCountrySongRepository(tokenManager)
                                 }
                                 val context = LocalContext.current
-                                val song by produceState<CountrySong?>(
-                                    initialValue = null,
-                                    songId
-                                ) {
-                                    Log.d(
-                                        "MiniPlayer",
-                                        "produceState: fetching songId=$songId"
-                                    )
-                                    value =
-                                        countrySongRepository.getCountrySongById(
-                                            songId
-                                        )
-                                    Log.d(
-                                        "MiniPlayer",
-                                        "produceState: result=${value?.title}"
-                                    )
-                                }
+                                val song by
+                                        produceState<CountrySong?>(initialValue = null, songId) {
+                                            Log.d(
+                                                    "MiniPlayer",
+                                                    "produceState: fetching songId=$songId"
+                                            )
+                                            value = countrySongRepository.getCountrySongById(songId)
+                                            Log.d(
+                                                    "MiniPlayer",
+                                                    "produceState: result=${value?.title}"
+                                            )
+                                        }
 
                                 LaunchedEffect(song) {
                                     if (song != null) {
                                         Log.d(
-                                            "MiniPlayer",
-                                            "LaunchedEffect song type: ${song!!::class.simpleName}"
+                                                "MiniPlayer",
+                                                "LaunchedEffect song type: ${song!!::class.simpleName}"
                                         )
                                         playSong(song!!, context)
                                         navController.navigate("main") {
@@ -356,17 +291,15 @@ class MainActivity : ComponentActivity() {
 
                                 if (song != null) {
                                     CountrySongPlayer(
-                                        navController = navController,
-                                        repository = countrySongRepository,
-                                        songId = songId
+                                            navController = navController,
+                                            repository = countrySongRepository,
+                                            songId = songId
                                     )
                                 } else {
                                     Box(
-                                        Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator()
-                                    }
+                                            Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                    ) { CircularProgressIndicator() }
                                 }
                             }
                         }
@@ -379,8 +312,7 @@ class MainActivity : ComponentActivity() {
 
     // Simple synchronous check using the blocking getAccessToken
     private fun checkInitialAuthState(tokenManager: TokenManager): Boolean {
-        val hasToken =
-            tokenManager.getAccessToken() != null // Use the blocking version here
+        val hasToken = tokenManager.getAccessToken() != null // Use the blocking version here
         Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
         return hasToken
     }
@@ -389,8 +321,7 @@ class MainActivity : ComponentActivity() {
         val data = intent?.data
         if (data != null && data.scheme == "purrytify" && data.host == "song") {
             val songId = data.lastPathSegment?.toIntOrNull()
-            val type =
-                data.getQueryParameter("type") // misal: purrytify://song/123?type=country
+            val type = data.getQueryParameter("type") // misal: purrytify://song/123?type=country
             if (songId != null) {
                 if (type == "country") {
                     navController?.navigate("country_song_player/$songId")
@@ -404,50 +335,38 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun rememberPoppinsFontFamily(): FontFamily {
         val provider =
-            GoogleFont.Provider(
-                providerAuthority = "com.google.android.gms.fonts",
-                providerPackage = "com.google.android.gms",
-                certificates = R.array.com_google_android_gms_fonts_certs
-            )
+                GoogleFont.Provider(
+                        providerAuthority = "com.google.android.gms.fonts",
+                        providerPackage = "com.google.android.gms",
+                        certificates = R.array.com_google_android_gms_fonts_certs
+                )
         val fontName = GoogleFont("Poppins")
 
         return remember {
             FontFamily(
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Light
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Normal
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Medium
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.SemiBold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Bold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.ExtraBold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Black
-                )
+                    Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Light),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.Normal
+                    ),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.Medium
+                    ),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.SemiBold
+                    ),
+                    Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Bold),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.ExtraBold
+                    ),
+                    Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Black)
             )
         }
     }
@@ -456,31 +375,27 @@ class MainActivity : ComponentActivity() {
 // --- Main Authenticated Content Composable ---
 @Composable
 fun MainContent(
-    navController: NavHostController, // Top-level controller for logout
-    authRepository: AuthRepository, // Pass the repository instance
-    userRepository: UserRepository,
-    networkConnectivityObserver: NetworkConnectivityObserver,
-    tokenManager: TokenManager // Added tokenManager parameter
+        navController: NavHostController, // Top-level controller for logout
+        authRepository: AuthRepository, // Pass the repository instance
+        userRepository: UserRepository,
+        networkConnectivityObserver: NetworkConnectivityObserver,
+        tokenManager: TokenManager // Added tokenManager parameter
 ) {
-    val nestedNavController =
-        rememberNavController() // Controller for bottom nav sections
+    val nestedNavController = rememberNavController() // Controller for bottom nav sections
     val scope =
-        rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+            rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus =
-        networkConnectivityObserver
-            .observe()
-            .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE)
-            .value
+            networkConnectivityObserver
+                    .observe()
+                    .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE)
+                    .value
     val localSongViewModel: LocalSongViewModel = viewModel()
 
     // Callback untuk handle QR result
     val handleQrResult: (Int, String?) -> Unit = { songId, type ->
-        Log.d(
-            "MainActivity",
-            "handleQrResult called with songId: $songId, type: $type"
-        )
+        Log.d("MainActivity", "handleQrResult called with songId: $songId, type: $type")
         if (type == "country") {
             navController.navigate("country_song_player/$songId")
         } else {
@@ -511,130 +426,114 @@ fun MainContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Black,
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            bottomBar = {
-                Column {
-                    MiniPlayer(
-                        onDeleteClick = { song ->
-                            localSongViewModel.deleteSong(song)
-                        },
-                        viewModel = localSongViewModel,
-                    )
-                    BottomNavigationBar(navController = nestedNavController)
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Black,
+                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                bottomBar = {
+                    Column {
+                        MiniPlayer(
+                                onDeleteClick = { song -> localSongViewModel.deleteSong(song) },
+                                viewModel = localSongViewModel,
+                        )
+                        BottomNavigationBar(navController = nestedNavController)
+                    }
                 }
-            }
         ) { innerPadding ->
             NavHost(
-                navController = nestedNavController,
-                startDestination = BottomNavItem.Home.route,
-                modifier = Modifier.padding(innerPadding)
+                    navController = nestedNavController,
+                    startDestination = BottomNavItem.Home.route,
+                    modifier = Modifier.padding(innerPadding)
             ) {
                 composable(BottomNavItem.Home.route) {
                     HomeScreen(
-                        navController = navController, // Pass main navController
-                        nestedNavController = nestedNavController,
-                        onQrResult = handleQrResult // Pass callback
+                            navController = navController, // Pass main navController
+                            nestedNavController = nestedNavController,
+                            onQrResult = handleQrResult // Pass callback
                     )
                 }
                 composable(BottomNavItem.Library.route) {
-                    YourLibraryScreen(/* Pass dependencies */)
+                    YourLibraryScreen(/* Pass dependencies */ )
                 }
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
-                        authRepository = authRepository, // Pass the repository instance
-                        userRepository = userRepository,
-                        networkConnectivityObserver =
-                            networkConnectivityObserver, // Add this parameter
-                        navController =
-                            nestedNavController, // Pass the nested nav controller
-                        onLogout = {
-                            scope.launch { // Use the scope obtained from
-                                // rememberCoroutineScope()
-                                authRepository.logout()
-                                navController.navigate("auth") { // Navigate back to auth flow
-                                    popUpTo("main") { inclusive = true } // Clear main backstack
-                                    launchSingleTop = true
+                            authRepository = authRepository, // Pass the repository instance
+                            userRepository = userRepository,
+                            networkConnectivityObserver =
+                                    networkConnectivityObserver, // Add this parameter
+                            navController = nestedNavController, // Pass the nested nav controller
+                            onLogout = {
+                                scope.launch { // Use the scope obtained from
+                                    // rememberCoroutineScope()
+                                    authRepository.logout()
+                                    navController.navigate("auth") { // Navigate back to auth flow
+                                        popUpTo("main") { inclusive = true } // Clear main backstack
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
-                        }
                     )
                 }
                 composable("global_song") {
                     val context = LocalContext.current
-                    val localSongDao = remember {
-                        AppDatabase.getDatabase(context).localSongDao()
-                    }
+                    val localSongDao = remember { AppDatabase.getDatabase(context).localSongDao() }
                     val songRepository = remember {
                         createSongRepository(
-                            tokenManager = tokenManager,
-                            localSongDao = localSongDao,
-                            context = context
+                                tokenManager = tokenManager,
+                                localSongDao = localSongDao,
+                                context = context
                         )
                     }
-                    GlobalSong(
-                        navController = nestedNavController,
-                        repository = songRepository
-                    )
+                    GlobalSong(navController = nestedNavController, repository = songRepository)
                 }
                 composable("country_song") {
                     val context = LocalContext.current
-                    val localSongDao = remember {
-                        AppDatabase.getDatabase(context).localSongDao()
-                    }
+                    val localSongDao = remember { AppDatabase.getDatabase(context).localSongDao() }
                     val countrySongRepository = remember {
                         createCountrySongRepository(
-                            tokenManager = tokenManager,
-                            localSongDao = localSongDao,
-                            context = context
+                                tokenManager = tokenManager,
+                                localSongDao = localSongDao,
+                                context = context
                         )
                     }
                     CountrySong(
-                        navController = nestedNavController,
-                        repository = countrySongRepository
+                            navController = nestedNavController,
+                            repository = countrySongRepository
                     )
                 }
                 composable("recommendation_song") {
                     val context = LocalContext.current
-                    val localSongDao = remember {
-                        AppDatabase.getDatabase(context).localSongDao()
-                    }
+                    val localSongDao = remember { AppDatabase.getDatabase(context).localSongDao() }
                     val globalSongRepository = remember {
                         createSongRepository(
-                            tokenManager = tokenManager,
-                            localSongDao = localSongDao,
-                            context = context
+                                tokenManager = tokenManager,
+                                localSongDao = localSongDao,
+                                context = context
                         )
                     }
                     val countrySongRepository = remember {
                         createCountrySongRepository(
-                            tokenManager = tokenManager,
-                            localSongDao = localSongDao,
-                            context = context
+                                tokenManager = tokenManager,
+                                localSongDao = localSongDao,
+                                context = context
                         )
                     }
                     RecommendationSong(
-                        navController = nestedNavController,
-                        globalRepository = globalSongRepository,
-                        countryRepository = countrySongRepository
+                            navController = nestedNavController,
+                            globalRepository = globalSongRepository,
+                            countryRepository = countrySongRepository
                     )
                 }
 
-                composable("top_artists") {
-                    TopArtistsScreen(navController = nestedNavController)
-                }
-                composable("top_songs") {
-                    TopSongsScreen(navController = nestedNavController)
-                }
+                composable("top_artists") { TopArtistsScreen(navController = nestedNavController) }
+                composable("top_songs") { TopSongsScreen(navController = nestedNavController) }
                 composable("time_listened") {
                     TimeListenedScreen(navController = nestedNavController)
                 }
 
                 composable("scan_qr") {
                     ScanQrScreen(
-                        navController = navController, // Pass main navController
-                        onQrResult = handleQrResult // Pass callback
+                            navController = navController, // Pass main navController
+                            onQrResult = handleQrResult // Pass callback
                     )
                 }
             }
@@ -643,22 +542,16 @@ fun MainContent(
 }
 
 @Composable
-fun GlobalSongPlayer(
-    navController: NavHostController,
-    repository: SongRepository,
-    songId: Int
-) {
+fun GlobalSongPlayer(navController: NavHostController, repository: SongRepository, songId: Int) {
     val context = LocalContext.current
-    val song by produceState<TopSong?>(initialValue = null, songId) {
-        value = repository.getSongById(songId)
-    }
+    val song by
+            produceState<TopSong?>(initialValue = null, songId) {
+                value = repository.getSongById(songId)
+            }
 
     LaunchedEffect(song) {
         if (song != null) {
-            Log.d(
-                "MiniPlayer",
-                "LaunchedEffect song type: ${song!!::class.simpleName}"
-            )
+            Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
             playSong(song!!, context)
         }
     }
@@ -668,21 +561,19 @@ fun GlobalSongPlayer(
 
 @Composable
 fun CountrySongPlayer(
-    navController: NavHostController,
-    repository: CountrySongRepository,
-    songId: Int
+        navController: NavHostController,
+        repository: CountrySongRepository,
+        songId: Int
 ) {
     val context = LocalContext.current
-    val song by produceState<CountrySong?>(initialValue = null, songId) {
-        value = repository.getCountrySongById(songId)
-    }
+    val song by
+            produceState<CountrySong?>(initialValue = null, songId) {
+                value = repository.getCountrySongById(songId)
+            }
 
     LaunchedEffect(song) {
         if (song != null) {
-            Log.d(
-                "MiniPlayer",
-                "LaunchedEffect song type: ${song!!::class.simpleName}"
-            )
+            Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
             playSong(song!!, context)
         }
     }

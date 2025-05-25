@@ -52,7 +52,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
         repository = ListeningSessionRepository(listeningSessionDao)
         localSongRepository = LocalSongRepository(localSongDao)
 
-        // Initialize online song repositories
         val tokenManager = TokenManager(application)
         songRepository = com.purrytify.mobile.data.createSongRepository(tokenManager)
         countrySongRepository = com.purrytify.mobile.data.createCountrySongRepository(tokenManager)
@@ -70,9 +69,7 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
             val monthlyDataList = mutableListOf<MonthlyListeningData>()
 
-            // Get data for current month and previous months, but only include months with actual
-            // data
-            for (monthOffset in 0..5) { // Check up to 6 months back
+            for (monthOffset in 0..5) {
                 val targetMonth =
                         if (currentMonth - monthOffset > 0) {
                             currentMonth - monthOffset
@@ -88,16 +85,14 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
                 val totalTime = repository.getTotalListeningTimeForMonth(targetMonth, targetYear)
 
-                // Only add months that have actual listening data (more than 0 minutes)
                 if (totalTime > 0) {
                     val topArtist = repository.getTopArtistForMonth(targetMonth, targetYear)
                     val topSong = repository.getTopSongForMonth(targetMonth, targetYear)
 
                     val monthName = getMonthName(targetMonth, targetYear)
-                    val totalMinutes = totalTime / (1000 * 60) // Convert to minutes
+                    val totalMinutes = totalTime / (1000 * 60)
                     val formattedTime = "$totalMinutes minutes"
 
-                    // Add achievement for current month if listening time is significant
                     val hasAchievement = monthOffset == 0 && totalMinutes > 300 // 5+ hours
                     val achievementText =
                             if (hasAchievement) "You had a great listening month!" else null
@@ -108,7 +103,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
                     val achievementDate =
                             if (hasAchievement) getDateRange(targetMonth, targetYear) else null
 
-                    // Get image URLs from local songs database
                     val topArtistImageUrl = getArtistImageUrl(topArtist?.artist)
                     val topSongImageUrl = getSongImageUrl(topSong?.songTitle, topSong?.artist)
 
@@ -129,7 +123,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
 
-                // Limit to showing maximum 2 months with data
                 if (monthlyDataList.size >= 2) break
             }
 
@@ -178,7 +171,7 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
     private fun getDaysInMonth(month: Int, year: Int): Int {
         val calendar = Calendar.getInstance()
-        calendar.set(year, month - 1, 1) // Calendar.MONTH is 0-based
+        calendar.set(year, month - 1, 1)
         return calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
     }
 
@@ -225,7 +218,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
         android.util.Log.d("SoundCapsule", "Looking for artist: '$artistName'")
 
-        // First, try to find in local songs database
         try {
             val allLocalSongs = localSongRepository.allSongs.first()
             val localSongByArtist =
@@ -241,7 +233,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             android.util.Log.e("SoundCapsule", "Error searching local songs for artist", e)
         }
 
-        // If not found in local songs, try online songs (TopSongs)
         try {
             val topSongsResult = songRepository.getTopSongs()
             if (topSongsResult.isSuccess) {
@@ -260,7 +251,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             android.util.Log.e("SoundCapsule", "Error searching online top songs for artist", e)
         }
 
-        // If still not found, try country songs
         try {
             val countrySongsResult = countrySongRepository.getCountrySongs()
             if (countrySongsResult.isSuccess) {
@@ -288,7 +278,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
         android.util.Log.d("SoundCapsule", "Looking for song: '$songTitle' by '$artist'")
 
-        // First, try to find in local songs database
         try {
             val allLocalSongs = localSongRepository.allSongs.first()
             android.util.Log.d(
@@ -313,7 +302,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             android.util.Log.e("SoundCapsule", "Error searching local songs", e)
         }
 
-        // If not found in local songs, try online songs (TopSongs)
         try {
             val topSongsResult = songRepository.getTopSongs()
             if (topSongsResult.isSuccess) {
@@ -338,7 +326,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             android.util.Log.e("SoundCapsule", "Error searching online top songs", e)
         }
 
-        // If still not found, try country songs
         try {
             val countrySongsResult = countrySongRepository.getCountrySongs()
             if (countrySongsResult.isSuccess) {

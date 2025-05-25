@@ -10,6 +10,7 @@ import com.purrytify.mobile.MainActivity
 import com.purrytify.mobile.api.ApiClient
 import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.data.TokenManager
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,26 +18,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.TimeUnit
 
 class TokenExpirationService : Service() {
 
-    private lateinit var authRepository: AuthRepository //Remove inject
-    private lateinit var tokenManager: TokenManager //Remove inject
+    private lateinit var authRepository: AuthRepository
+    private lateinit var tokenManager: TokenManager
 
     private val job = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + job)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("TokenService", "Service started") // Add log here
-        // Create Retrofit instance
+        Log.d("TokenService", "Service started")
         val retrofit = ApiClient.buildRetrofit()
 
-        // Create AuthService
         val authService = ApiClient.createAuthService(retrofit)
-//        val userService = ApiClient.createUserService(retrofit)
 
-        // Create TokenManager, needs context
         tokenManager = TokenManager(this)
 
         authRepository = AuthRepository(tokenManager, authService)
@@ -90,21 +86,18 @@ class TokenExpirationService : Service() {
         }
     }
 
-
     private fun logout() {
         Log.d("TokenService", "Logging out...")
-        // Use runBlocking to ensure the logout completes before the service stops
         runBlocking(Dispatchers.Main) {
             try {
-                // Clear tokens synchronously
                 tokenManager.clearTokensSync()
                 Log.d("TokenService", "Tokens cleared successfully")
 
-                // Create and start the logout intent
-                val intent = Intent(this@TokenExpirationService, MainActivity::class.java).apply {
-                    flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK
-                    putExtra("isLogout", true)
-                }
+                val intent =
+                        Intent(this@TokenExpirationService, MainActivity::class.java).apply {
+                            flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK
+                            putExtra("isLogout", true)
+                        }
                 startActivity(intent)
                 Log.d("TokenService", "Started MainActivity with logout flag")
             } catch (e: Exception) {
@@ -112,16 +105,15 @@ class TokenExpirationService : Service() {
             }
         }
 
-        // Stop the service after everything is done
         stopSelf()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        job.cancel() // Cancel coroutines when service is destroyed
+        job.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        return null // Not a bound service
+        return null
     }
 }
