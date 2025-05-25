@@ -245,7 +245,7 @@ class MainActivity : ComponentActivity() {
                                         Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
                                         playSong(song!!, context)
                                         navController.navigate("main") {
-                                            popUpTo(route.toString()) { inclusive = true }
+                                            popUpTo("global_song_player/{songId}") { inclusive = true }
                                         }
                                     }
                                 }
@@ -283,7 +283,7 @@ class MainActivity : ComponentActivity() {
                                         Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
                                         playSong(song!!, context)
                                         navController.navigate("main") {
-                                            popUpTo(route.toString()) { inclusive = true }
+                                            popUpTo("country_song_player/{songId}") { inclusive = true }
                                         }
                                     }
                                 }
@@ -386,20 +386,29 @@ class MainActivity : ComponentActivity() {
 // --- Main Authenticated Content Composable ---
 @Composable
 fun MainContent(
-    navController: NavHostController, // Top-level controller for logout
-    authRepository: AuthRepository, // Pass the repository instance
+    navController: NavHostController,
+    authRepository: AuthRepository,
     userRepository: UserRepository,
     networkConnectivityObserver: NetworkConnectivityObserver,
-    tokenManager: TokenManager // Added tokenManager parameter
+    tokenManager: TokenManager
 ) {
-    val nestedNavController = rememberNavController() // Controller for bottom nav sections
-    val scope =
-        rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+    val nestedNavController = rememberNavController()
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus = networkConnectivityObserver.observe()
         .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
     val localSongViewModel: LocalSongViewModel = viewModel()
+
+    // Callback untuk handle QR result
+    val handleQrResult: (Int, String?) -> Unit = { songId, type ->
+        Log.d("MainActivity", "handleQrResult called with songId: $songId, type: $type")
+        if (type == "country") {
+            navController.navigate("country_song_player/$songId")
+        } else {
+            navController.navigate("global_song_player/$songId")
+        }
+    }
 
     // Initialize MediaPlayer
     LaunchedEffect(Unit) { initializeMediaPlayer(context) }
@@ -411,16 +420,14 @@ fun MainContent(
             NetworkConnectivityObserver.Status.LOST -> {
                 snackbarHostState.showSnackbar("No network connection")
             }
-
             NetworkConnectivityObserver.Status.AVAILABLE -> {
                 if (snackbarHostState.currentSnackbarData != null) {
                     snackbarHostState.currentSnackbarData?.dismiss()
-                    delay(300) // Give time for previous snackbar to dismiss
+                    delay(300)
                     snackbarHostState.showSnackbar("Network connection restored")
                 }
             }
-
-            else -> {} // Do nothing for LOSING state
+            else -> {}
         }
     }
 
@@ -447,19 +454,25 @@ fun MainContent(
                 modifier = Modifier.padding(innerPadding)
             ) {
                 composable(BottomNavItem.Home.route) {
-                    HomeScreen(navController = nestedNavController)
+                    HomeScreen(
+                        navController = navController, // Pass main navController
+                        nestedNavController = nestedNavController,
+                        onQrResult = handleQrResult // Pass callback
+                    )
                 }
-                composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Library.route) { 
+                    YourLibraryScreen(/* Pass dependencies */) 
+                }
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
-                        authRepository = authRepository, // Pass the repository instance
+                        authRepository = authRepository,
                         userRepository = userRepository,
-                        networkConnectivityObserver = networkConnectivityObserver, // Add this parameter
+                        networkConnectivityObserver = networkConnectivityObserver,
                         onLogout = {
-                            scope.launch { // Use the scope obtained from rememberCoroutineScope()
+                            scope.launch {
                                 authRepository.logout()
-                                navController.navigate("auth") { // Navigate back to auth flow
-                                    popUpTo("main") { inclusive = true } // Clear main backstack
+                                navController.navigate("auth") {
+                                    popUpTo("main") { inclusive = true }
                                     launchSingleTop = true
                                 }
                             }
@@ -468,7 +481,7 @@ fun MainContent(
                 }
                 composable("global_song") {
                     val songRepository = remember {
-                        createSongRepository(tokenManager) // Use passed tokenManager
+                        createSongRepository(tokenManager)
                     }
                     GlobalSong(
                         navController = nestedNavController,
@@ -477,7 +490,7 @@ fun MainContent(
                 }
                 composable("country_song") {
                     val countrySongRepository = remember {
-                        createCountrySongRepository(tokenManager) // Use passed tokenManager
+                        createCountrySongRepository(tokenManager)
                     }
                     CountrySong(
                         navController = nestedNavController,
@@ -485,7 +498,10 @@ fun MainContent(
                     )
                 }
                 composable("scan_qr") {
-                    ScanQrScreen(navController = nestedNavController)
+                    ScanQrScreen(
+                        navController = navController, // Pass main navController
+                        onQrResult = handleQrResult // Pass callback
+                    )
                 }
             }
         }
