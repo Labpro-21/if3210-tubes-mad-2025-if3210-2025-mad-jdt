@@ -75,6 +75,7 @@ import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.materialIcon
 import androidx.room.util.TableInfo
 import com.purrytify.mobile.ui.AudioOutputBottomSheet
+import com.purrytify.mobile.utils.ListeningTracker
 import com.purrytify.mobile.utils.OutputDevice
 import com.purrytify.mobile.utils.setAudioOutput
 import com.purrytify.mobile.utils.getAvailableOutputDevices
@@ -248,9 +249,13 @@ fun MiniPlayer(
                             if (MiniPlayerState.isPlaying) {
                                 MiniPlayerState.mediaPlayer?.pause()
                                 MiniPlayerState.isPlaying = false
+                                ListeningTracker.pauseListening()
                             } else {
                                 MiniPlayerState.mediaPlayer?.start()
                                 MiniPlayerState.isPlaying = true
+                                MiniPlayerState.currentSong?.let { song ->
+                                    ListeningTracker.resumeListening(song)
+                                }
                             }
                         }
                 )
@@ -282,6 +287,7 @@ fun initializeMediaPlayer(context: android.content.Context) {
                 setOnCompletionListener {
                     MiniPlayerState.isPlaying = false
                     MiniPlayerState.currentPosition = 0
+                    ListeningTracker.stopListening()
                 }
                 val stopIntent = Intent(context, MusicNotificationService::class.java).apply {
                     action = MusicNotificationService.ACTION_STOP
@@ -289,6 +295,7 @@ fun initializeMediaPlayer(context: android.content.Context) {
                 context.startService(stopIntent)
                 setOnErrorListener { mp, what, extra ->
                     android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
+                    ListeningTracker.stopListening()
                     false
                 }
             }
@@ -303,6 +310,16 @@ fun playSong(song: LocalSong, context: android.content.Context) {
     try {
         android.util.Log.d("MiniPlayer", "Attempting to play song: ${song.title}")
         android.util.Log.d("MiniPlayer", "File path: ${song.filePath}")
+
+        // Initialize ListeningTracker
+        ListeningTracker.initialize(context)
+        
+        // If switching songs, stop tracking the previous song
+        if (MiniPlayerState.currentSong != null && MiniPlayerState.currentSong?.id != song.id) {
+            ListeningTracker.switchSong(song)
+        } else {
+            ListeningTracker.startListening(song)
+        }
 
         if (MiniPlayerState.mediaPlayer == null) {
             initializeMediaPlayer(context)
@@ -351,6 +368,7 @@ fun playSong(song: LocalSong, context: android.content.Context) {
 
                 setOnErrorListener { mp, what, extra ->
                     android.util.Log.e("MiniPlayer", "MediaPlayer error: what=$what extra=$extra")
+                    ListeningTracker.stopListening()
                     false
                 }
 
@@ -363,6 +381,7 @@ fun playSong(song: LocalSong, context: android.content.Context) {
         }
     } catch (e: Exception) {
         android.util.Log.e("MiniPlayer", "Error playing song", e)
+        ListeningTracker.stopListening()
         android.widget.Toast.makeText(
             context,
             "Error playing song: ${e.message}",
@@ -773,9 +792,13 @@ fun ExpandedPlayer(
                                 if (MiniPlayerState.isPlaying) {
                                     MiniPlayerState.mediaPlayer?.pause()
                                     MiniPlayerState.isPlaying = false
+                                    ListeningTracker.pauseListening()
                                 } else {
                                     MiniPlayerState.mediaPlayer?.start()
                                     MiniPlayerState.isPlaying = true
+                                    MiniPlayerState.currentSong?.let { song ->
+                                        ListeningTracker.resumeListening(song)
+                                    }
                                 }
                             },
                             modifier = Modifier.size(72.dp)

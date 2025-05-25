@@ -13,6 +13,7 @@ import androidx.media.app.NotificationCompat.MediaStyle
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.room.LocalSong
 import com.purrytify.mobile.ui.MiniPlayerState
+import com.purrytify.mobile.utils.ListeningTracker
 
 class MusicNotificationService : Service() {
 
@@ -49,9 +50,13 @@ class MusicNotificationService : Service() {
             if (player.isPlaying) {
                 player.pause()
                 MiniPlayerState.isPlaying = false
+                ListeningTracker.pauseListening()
             } else {
                 player.start()
                 MiniPlayerState.isPlaying = true
+                MiniPlayerState.currentSong?.let { song ->
+                    ListeningTracker.resumeListening(song)
+                }
             }
         }
         showNotification()
@@ -157,6 +162,7 @@ class MusicNotificationService : Service() {
         stopForeground(true)
         MiniPlayerState.mediaPlayer?.stop()
         MiniPlayerState.isPlaying = false
+        ListeningTracker.stopListening()
         super.onDestroy()
     }
 }

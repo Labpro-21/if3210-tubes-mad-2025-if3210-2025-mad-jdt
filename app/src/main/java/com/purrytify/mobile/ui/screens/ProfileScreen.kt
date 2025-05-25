@@ -1,6 +1,7 @@
 package com.purrytify.mobile.ui.screens
 
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,12 +19,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +48,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +75,7 @@ import com.purrytify.mobile.viewmodel.EditProfileState
 import com.purrytify.mobile.viewmodel.ProfileUiState
 import com.purrytify.mobile.viewmodel.ProfileViewModel
 import com.purrytify.mobile.viewmodel.ProfileViewModelFactory
+import com.purrytify.mobile.viewmodel.SoundCapsuleViewModel
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -186,7 +198,8 @@ fun ProfileScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 60.dp, start = 16.dp, end = 16.dp),
+                            .padding(top = 60.dp, start = 16.dp, end = 16.dp)
+                            .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         when (profileState) {
@@ -259,6 +272,11 @@ fun ProfileScreen(
                                     StatItem("32", "LIKED")
                                     StatItem("50", "LISTENED")
                                 }
+
+                                Spacer(modifier = Modifier.height(30.dp))
+
+                                // Sound Capsule Section
+                                SoundCapsuleSection()
 
                                 Spacer(modifier = Modifier.height(30.dp))
                                 Button(
@@ -636,6 +654,383 @@ fun ProfileScreen(
                     showMapLocationPicker = false
                 }
             )
+        }
+    }
+}
+
+@Composable
+fun SoundCapsuleSection() {
+    val soundCapsuleViewModel: SoundCapsuleViewModel = viewModel()
+    val monthlyData by soundCapsuleViewModel.monthlyData.collectAsState()
+    val isLoading by soundCapsuleViewModel.isLoading.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Refresh data every time this composable is displayed
+    LaunchedEffect(Unit) {
+        soundCapsuleViewModel.refreshData()
+    }
+
+    // Also refresh when the screen becomes visible (lifecycle aware)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                soundCapsuleViewModel.refreshData()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Your Sound Capsule",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { soundCapsuleViewModel.refreshData() },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFF1DB954))
+            }
+        } else if (monthlyData.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "No listening data yet",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = "Start playing some music to see your stats!",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        } else {
+            monthlyData.forEachIndexed { index, data ->
+                SoundCapsuleMonthSection(
+                    month = data.month,
+                    minutes = data.formattedTime,
+                    topArtist = data.topArtist ?: "No data",
+                    topArtistImageUrl = data.topArtistImageUrl,
+                    topSong = data.topSong ?: "No data",
+                    topSongImageUrl = data.topSongImageUrl,
+                    achievementText = data.achievementText,
+                    achievementSubtext = data.achievementSubtext,
+                    achievementDate = data.achievementDate
+                )
+
+                if (index < monthlyData.size - 1) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SoundCapsuleMonthSection(
+    month: String,
+    minutes: String,
+    topArtist: String,
+    topArtistImageUrl: String?,
+    topSong: String,
+    topSongImageUrl: String?,
+    achievementText: String?,
+    achievementSubtext: String?,
+    achievementDate: String?
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Color(0xFF1A1A1A),
+                RoundedCornerShape(16.dp)
+            )
+            .padding(20.dp)
+    ) {
+        // Month header with share icon
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = month,
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = "Share",
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Time listened - prominent display
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Time listened",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowRight,
+                    contentDescription = "View Details",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = minutes,
+                color = Color(0xFF1DB954),
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Top artist and song cards
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Top artist card
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        Color(0xFF2A2A2A),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(16.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Top artist",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowRight,
+                            contentDescription = "View Artist Details",
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Artist image - larger and centered
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(topArtistImageUrl?.let { 
+                                if (it.startsWith("http")) it else Uri.parse(it)
+                            } ?: R.drawable.profile_image)
+                            .error(R.drawable.profile_image)
+                            .placeholder(R.drawable.profile_image)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Artist Image",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.Gray),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = topArtist,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2
+                    )
+                }
+            }
+
+            // Top song card
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        Color(0xFF2A2A2A),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(16.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Top song",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowRight,
+                            contentDescription = "View Song Details",
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Log.d("topSongImageUrl", topSongImageUrl.toString())
+                    // Song image - larger and centered
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(topSongImageUrl?.let { 
+                                if (it.startsWith("http")) it else Uri.parse(it)
+                            } ?: R.drawable.profile_image)
+                            .error(R.drawable.profile_image)
+                            .placeholder(R.drawable.profile_image)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Song Image",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Gray),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = topSong,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2
+                    )
+                }
+            }
+        }
+
+        // Achievement card (only for April)
+        achievementText?.let {
+            Spacer(modifier = Modifier.height(24.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color(0xFF8B5CF6),
+                                Color(0xFF06B6D4)
+                            )
+                        ),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = achievementText,
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    achievementSubtext?.let { subtext ->
+                        Text(
+                            text = subtext,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    achievementDate?.let { date ->
+                        Text(
+                            text = date,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
