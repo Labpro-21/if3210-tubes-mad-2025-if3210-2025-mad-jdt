@@ -60,6 +60,10 @@ import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.R.attr.type
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.purrytify.mobile.ui.ScanQrScreen
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -67,6 +71,8 @@ val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
 }
 
 class MainActivity : ComponentActivity() {
+
+    private var navController: NavHostController? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -78,8 +84,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleDeepLink(intent)
         Log.d("MainActivity", "onCreate: MainActivity is starting!")
 
         // Handle logout intent
@@ -140,6 +152,7 @@ class MainActivity : ComponentActivity() {
                 val poppinsFontFamily: FontFamily = rememberPoppinsFontFamily()
                 CompositionLocalProvider(LocalPoppinsFont provides poppinsFontFamily) {
                     val navController = rememberNavController()
+                    this@MainActivity.navController = navController
 
                     val startDestination = remember {
                         if (checkInitialAuthState(tokenManager)) "main" else "auth"
@@ -188,6 +201,21 @@ class MainActivity : ComponentActivity() {
                                 tokenManager = tokenManager // Pass tokenManager
                             )
                         }
+
+                        composable(
+                            route = "global_song_player/{songId}",
+                            arguments = listOf(navArgument("songId") { type = NavType.IntType })
+                        ) { navBackStackEntry ->
+                            val songId = navBackStackEntry.arguments?.getInt("songId")
+                            if (songId != null) {
+                                val songRepository = remember { createSongRepository(tokenManager) }
+                                GlobalSong(
+                                    navController = navController,
+                                    repository = songRepository
+                                )
+                            }
+                        }
+
                     }
                 }
             }
@@ -201,6 +229,16 @@ class MainActivity : ComponentActivity() {
             tokenManager.getAccessToken() != null // Use the blocking version here
         Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
         return hasToken
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data
+        if (data != null && data.scheme == "purrytify" && data.host == "song") {
+            val songId = data.lastPathSegment?.toIntOrNull()
+            if (songId != null) {
+                navController?.navigate("global_song_player/$songId")
+            }
+        }
     }
 
     @Composable
@@ -354,6 +392,9 @@ fun MainContent(
                         navController = nestedNavController,
                         repository = countrySongRepository
                     )
+                }
+                composable("scan_qr") {
+                    ScanQrScreen(navController = nestedNavController)
                 }
             }
         }

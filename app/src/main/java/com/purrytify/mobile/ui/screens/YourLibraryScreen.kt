@@ -397,12 +397,12 @@ fun YourLibraryScreen() {
             ) {
                 itemsIndexed(
                     items = songsToShow,
-                    key = { _, song -> song.id } // Use song ID as key for better performance
+                    key = { _, song -> song.id }
                 ) { index, song ->
                     LocalSongItem(
                         song = song,
                         onPlayClick = { playSong(song, context) },
-                        isPlaying = MiniPlayerState.isPlaying && MiniPlayerState.currentSong?.id == song.id,
+                        isPlaying = MiniPlayerState.isPlaying && isCurrentSongLocalSongId(song.id),
                         onEditClick = {
                             selectedLocalSong = song
                             // Prefill form fields for editing
@@ -883,4 +883,9 @@ fun LocalSongItem(
             }
         }
     }
+}
+
+fun isCurrentSongLocalSongId(id: Long): Boolean {
+    val song = MiniPlayerState.currentSong
+    return song is LocalSong && song.id == id
 }

@@ -43,6 +43,9 @@ import com.purrytify.mobile.ui.playSong
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import androidx.navigation.NavHostController
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.IconButton
 
 @Composable
 fun HomeScreen(
@@ -55,6 +58,11 @@ fun HomeScreen(
     val newSongs by remember { mutableStateOf(allSongs.takeLast(10)) }
     val isLoading by localSongViewModel.isLoading.collectAsState()
     val errorMessage by localSongViewModel.errorMessage.collectAsState()
+
+    fun isCurrentSongLocalSongId(id: Long): Boolean {
+        val song = MiniPlayerState.currentSong
+        return song is LocalSong && song.id == id
+    }
 
     Box(
         modifier = Modifier
@@ -91,6 +99,21 @@ fun HomeScreen(
                             fontSize = 14.sp,
                             fontFamily = LocalPoppinsFont.current
                         )
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = { navController.navigate("scan_qr") }) {
+                    Icon(
+                        imageVector = Icons.Filled.QrCodeScanner,
+                        contentDescription = "Scan QR",
+                        tint = Color.White
                     )
                 }
             }
@@ -182,7 +205,7 @@ fun HomeScreen(
                                 HomeSongItem(
                                     song = song,
                                     onPlayClick = { playSong(song, context) },
-                                    isPlaying = MiniPlayerState.isPlaying && MiniPlayerState.currentSong?.id == song.id
+                                    isPlaying = isCurrentSongLocalSongId(song.id)
                                 )
                             }
                         }
@@ -218,7 +241,7 @@ fun HomeScreen(
                                 RecentSongCard(
                                     song = song,
                                     onPlayClick = { playSong(song, context) },
-                                    isPlaying = MiniPlayerState.isPlaying && MiniPlayerState.currentSong?.id == song.id
+                                    isPlaying = isCurrentSongLocalSongId(song.id)
                                 )
                             }
                         }

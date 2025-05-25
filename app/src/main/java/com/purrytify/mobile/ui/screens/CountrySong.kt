@@ -203,8 +203,7 @@ fun CountrySongItem(
             .fillMaxWidth()
             .clickable {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                val localSong = song.toLocalSong()
-                playSong(localSong, context)
+                playSong(song, context)
             }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -244,8 +243,7 @@ fun CountrySongItem(
         IconButton(
             onClick = {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                val localSong = song.toLocalSong()
-                playSong(localSong, context)
+                playSong(song, context)
             }
         ) {
             Icon(

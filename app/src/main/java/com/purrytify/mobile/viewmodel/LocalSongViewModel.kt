@@ -163,8 +163,8 @@ private fun getRealPathFromUri(uri: Uri): String? {
                 val updatedSong = song.copy(isLiked = !song.isLiked)
                 // Update in database
                 repository.update(updatedSong)
-                // Update MiniPlayerState if it's the current song
-                if (MiniPlayerState.currentSong?.id == song.id) {
+                val current = MiniPlayerState.currentSong
+                if (current is LocalSong && current.id == song.id) {
                     MiniPlayerState.currentSong = updatedSong
                 }
             } catch (e: Exception) {

@@ -41,6 +41,9 @@ import com.purrytify.mobile.data.SongRepository
 import com.purrytify.mobile.data.room.TopSong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.ui.playSong
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.produceState
+import androidx.navigation.NavHostController
 
 
 @Composable
@@ -159,7 +162,8 @@ fun GlobalSong(
                 itemsIndexed(topSongs) { index, song ->
                     SongItem(
                         index = index + 1,
-                        song = song
+                        song = song,
+                        navController = navController
                     )
                 }
             }
@@ -170,7 +174,8 @@ fun GlobalSong(
 @Composable
 fun SongItem(
     index: Int,
-    song: TopSong
+    song: TopSong,
+    navController: NavController
 ) {
     val context = LocalContext.current
     
@@ -179,8 +184,7 @@ fun SongItem(
             .fillMaxWidth()
             .clickable {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                val localSong = song.toLocalSong()
-                playSong(localSong, context)
+                playSong(song, context)
             }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -220,8 +224,7 @@ fun SongItem(
         IconButton(
             onClick = {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
-                val localSong = song.toLocalSong()
-                playSong(localSong, context)
+                playSong(song, context)
             }
         ) {
             Icon(

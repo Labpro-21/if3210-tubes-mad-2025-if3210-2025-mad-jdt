@@ -23,6 +23,11 @@ class SongRepository(private val songService: SongService) {
             Result.failure(e)
         }
     }
+
+    suspend fun getSongById(songId: Int): TopSong? {
+        val response = songService.getTopSongs(songId)
+        return if (response.isSuccessful) response.body() else null
+    }
 }
 
 // Example of how to create the repository:
