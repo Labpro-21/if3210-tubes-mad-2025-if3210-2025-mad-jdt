@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 class LocalSongRepository(private val localSongDao: LocalSongDao) {
     val allSongs: Flow<List<LocalSong>> = localSongDao.getAllSongs()
     val likedSongs: Flow<List<LocalSong>> = localSongDao.getLikedSongs()
+    val downloadedSongs: Flow<List<LocalSong>> = localSongDao.getDownloadedSongs()
 
     suspend fun insert(song: LocalSong): Long {
         return localSongDao.insert(song)
@@ -25,4 +26,8 @@ class LocalSongRepository(private val localSongDao: LocalSongDao) {
     suspend fun getSongById(songId: Long): LocalSong? {
         return localSongDao.getSongById(songId)
     }
+
+    // fun getDownloadedSongs(): Flow<List<LocalSong>> {
+    //     return localSongDao.getDownloadedSongs()
+    // }
 }

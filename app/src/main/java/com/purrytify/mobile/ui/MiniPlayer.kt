@@ -303,6 +303,7 @@ fun playSong(song: LocalSong, context: android.content.Context) {
     try {
         android.util.Log.d("MiniPlayer", "Attempting to play song: ${song.title}")
         android.util.Log.d("MiniPlayer", "File path: ${song.filePath}")
+        android.util.Log.d("MiniPlayer", "Is downloaded: ${song.isDownloaded}")
 
         if (MiniPlayerState.mediaPlayer == null) {
             initializeMediaPlayer(context)
@@ -311,31 +312,51 @@ fun playSong(song: LocalSong, context: android.content.Context) {
         MiniPlayerState.mediaPlayer?.apply {
             reset()
             try {
-                // Convert the file path to a content URI
-                val contentUri = when {
-                    song.filePath.startsWith("content://") -> {
-                        // Already a content URI
-                        Uri.parse(song.filePath)
-                    }
-                    song.filePath.startsWith("/") -> {
-                        // Convert file path to URI using FileProvider
+                when {
+                    // For downloaded songs (internal storage files)
+                    song.isDownloaded && song.filePath.startsWith("/") -> {
                         val file = File(song.filePath)
+                        android.util.Log.d("MiniPlayer", "Playing downloaded file: ${file.absolutePath}")
                         android.util.Log.d("MiniPlayer", "File exists: ${file.exists()}")
-                        androidx.core.content.FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.provider",
-                            file
-                        )
+                        
+                        if (file.exists()) {
+                            // For internal storage files, use direct file path
+                            setDataSource(file.absolutePath)
+                        } else {
+                            throw Exception("Downloaded file not found: ${file.absolutePath}")
+                        }
+                    }
+                    // For content URIs (user-added songs)
+                    song.filePath.startsWith("content://") -> {
+                        android.util.Log.d("MiniPlayer", "Playing content URI: ${song.filePath}")
+                        setDataSource(context, Uri.parse(song.filePath))
+                    }
+                    // For regular file paths (user-added songs)
+                    song.filePath.startsWith("/") -> {
+                        val file = File(song.filePath)
+                        android.util.Log.d("MiniPlayer", "Playing file path: ${file.absolutePath}")
+                        
+                        if (file.exists()) {
+                            // Try direct file access first
+                            setDataSource(file.absolutePath)
+                        } else {
+                            throw Exception("File not found: ${file.absolutePath}")
+                        }
+                    }
+                    // For URLs (streaming)
+                    song.filePath.startsWith("http") -> {
+                        android.util.Log.d("MiniPlayer", "Playing URL: ${song.filePath}")
+                        setDataSource(song.filePath)
                     }
                     else -> {
-                        // Try parsing as regular URI
-                        Uri.parse(song.filePath)
+                        // Fallback: try parsing as URI
+                        android.util.Log.d("MiniPlayer", "Trying to parse as URI: ${song.filePath}")
+                        setDataSource(context, Uri.parse(song.filePath))
                     }
                 }
 
-                android.util.Log.d("MiniPlayer", "Using URI: $contentUri")
-                setDataSource(context, contentUri)
                 MiniPlayerState.currentSong = song
+                MiniPlayerState.currentUrl = song.filePath
                 MiniPlayerState.isPlaying = true
 
                 // Start the notification service

@@ -194,8 +194,9 @@ fun YourLibraryScreen() {
         }
     }
 
-    val tabs = listOf("All", "Liked")
+    val tabs = listOf("All", "Liked", "Downloaded")
     var showBottomSheet by remember { mutableStateOf(false) }
+    val downloadedSongs by localSongViewModel.downloadedSongs.collectAsState()
 
     Column(
         modifier = Modifier
@@ -276,6 +277,20 @@ fun YourLibraryScreen() {
                     fontSize = 12.sp
                 )
             }
+            Button(
+                onClick = { selectedTabIndex = 2 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selectedTabIndex == 2) Color(0xFF1DB954) else Color.DarkGray,
+                    contentColor = if (selectedTabIndex == 2) Color.Black else Color.White
+                ),
+                shape = RoundedCornerShape(45.dp),
+                modifier = Modifier.size(100.dp, 32.dp)
+            ) {
+                Text(
+                    text = "Downloaded",
+                    fontSize = 12.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -316,7 +331,12 @@ fun YourLibraryScreen() {
             }
         }
 
-        val songsToShow = if (selectedTabIndex == 0) localSongs else likedLocalSongs
+        val songsToShow = when (selectedTabIndex) {
+            0 -> localSongs
+            1 -> likedLocalSongs
+            2 -> downloadedSongs
+            else -> emptyList()
+        }
 
         if (songsToShow.isEmpty() && !isLoading) {
             Box(
@@ -332,7 +352,12 @@ fun YourLibraryScreen() {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = if (selectedTabIndex == 0) "No songs yet" else "No liked songs yet",
+                        text = when (selectedTabIndex) {
+                            0 -> "No songs yet"
+                            1 -> "No liked songs yet" 
+                            2 -> "No downloaded songs yet"
+                            else -> ""
+                        },
                         style = TextStyle(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium,
