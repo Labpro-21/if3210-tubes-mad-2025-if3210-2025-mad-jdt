@@ -54,6 +54,9 @@ import com.purrytify.mobile.ui.screens.HomeScreen
 import com.purrytify.mobile.ui.screens.LoginScreen
 import com.purrytify.mobile.ui.screens.ProfileScreen
 import com.purrytify.mobile.ui.screens.SplashScreen
+import com.purrytify.mobile.ui.screens.TimeListenedScreen
+import com.purrytify.mobile.ui.screens.TopArtistsScreen
+import com.purrytify.mobile.ui.screens.TopSongsScreen
 import com.purrytify.mobile.ui.screens.YourLibraryScreen
 import com.purrytify.mobile.ui.theme.PurrytifyTheme
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
@@ -62,21 +65,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Composition Local for Poppins Font
-val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
-    error("Poppins font family not provided")
-}
+val LocalPoppinsFont =
+        staticCompositionLocalOf<FontFamily> { error("Poppins font family not provided") }
 
 class MainActivity : ComponentActivity() {
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Log.d("MainActivity", "Notification permission granted")
-        } else {
-            Log.d("MainActivity", "Notification permission denied")
-        }
-    }
+    private val requestPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+                    isGranted: Boolean ->
+                if (isGranted) {
+                    Log.d("MainActivity", "Notification permission granted")
+                } else {
+                    Log.d("MainActivity", "Notification permission denied")
+                }
+            }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,14 +94,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                            PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissionLauncher.launch(
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
@@ -108,30 +106,26 @@ class MainActivity : ComponentActivity() {
 
         // Create logout callback that restarts MainActivity with logout flag
         val onLogoutRequired = {
-            Log.d(
-                "MainActivity",
-                "Logout required from interceptor, restarting activity"
-            )
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags =
-                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("isLogout", true)
-            }
+            Log.d("MainActivity", "Logout required from interceptor, restarting activity")
+            val intent =
+                    Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        putExtra("isLogout", true)
+                    }
             startActivity(intent)
             finish()
         }
 
-        val retrofit = ApiClient.buildRetrofit(
-            tokenManager,
-            onLogoutRequired
-        ) // Pass tokenManager and logout callback
+        val retrofit =
+                ApiClient.buildRetrofit(
+                        tokenManager,
+                        onLogoutRequired
+                ) // Pass tokenManager and logout callback
         val authService = ApiClient.createAuthService(retrofit)
         val userService = ApiClient.createUserService(retrofit)
-        val authRepository =
-            AuthRepository(tokenManager, authService)
+        val authRepository = AuthRepository(tokenManager, authService)
         val userRepository = UserRepository(tokenManager, userService)
-        val networkConnectivityObserver =
-            NetworkConnectivityObserver(applicationContext)
+        val networkConnectivityObserver = NetworkConnectivityObserver(applicationContext)
         // --- End Dependencies ---
 
         setContent {
@@ -144,48 +138,36 @@ class MainActivity : ComponentActivity() {
                     val startDestination = remember {
                         if (checkInitialAuthState(tokenManager)) "main" else "auth"
                     }
-                    Log.d(
-                        "MainActivity",
-                        "Initial start destination: $startDestination"
-                    )
+                    Log.d("MainActivity", "Initial start destination: $startDestination")
 
-                    NavHost(
-                        navController = navController,
-                        startDestination = startDestination
-                    ) {
+                    NavHost(navController = navController, startDestination = startDestination) {
                         // Authentication Flow Graph
                         navigation(startDestination = "splash", route = "auth") {
                             composable("splash") {
                                 SplashScreen(
-                                    tokenManager = tokenManager,
-                                    authRepository = authRepository,
-                                    navController = navController
+                                        tokenManager = tokenManager,
+                                        authRepository = authRepository,
+                                        navController = navController
                                 )
                             }
                             composable("login") {
-                                Log.d(
-                                    "MainActivity",
-                                    "Navigating to LoginScreen"
-                                )
+                                Log.d("MainActivity", "Navigating to LoginScreen")
                                 LoginScreen(
-                                    authRepository = authRepository,
-                                    navController = navController
+                                        authRepository = authRepository,
+                                        navController = navController
                                 )
                             }
                         }
 
                         // Main Application Flow Graph
                         composable("main") {
-                            Log.d(
-                                "MainActivity",
-                                "Navigating to MainContent (main graph)"
-                            )
+                            Log.d("MainActivity", "Navigating to MainContent (main graph)")
                             MainContent(
-                                navController = navController,
-                                authRepository = authRepository,
-                                userRepository = userRepository,
-                                networkConnectivityObserver = networkConnectivityObserver,
-                                tokenManager = tokenManager // Pass tokenManager
+                                    navController = navController,
+                                    authRepository = authRepository,
+                                    userRepository = userRepository,
+                                    networkConnectivityObserver = networkConnectivityObserver,
+                                    tokenManager = tokenManager // Pass tokenManager
                             )
                         }
                     }
@@ -197,58 +179,46 @@ class MainActivity : ComponentActivity() {
 
     // Simple synchronous check using the blocking getAccessToken
     private fun checkInitialAuthState(tokenManager: TokenManager): Boolean {
-        val hasToken =
-            tokenManager.getAccessToken() != null // Use the blocking version here
+        val hasToken = tokenManager.getAccessToken() != null // Use the blocking version here
         Log.d("MainActivity", "checkInitialAuthState: hasToken = $hasToken")
         return hasToken
     }
 
     @Composable
     fun rememberPoppinsFontFamily(): FontFamily {
-        val provider = GoogleFont.Provider(
-            providerAuthority = "com.google.android.gms.fonts",
-            providerPackage = "com.google.android.gms",
-            certificates = R.array.com_google_android_gms_fonts_certs
-        )
+        val provider =
+                GoogleFont.Provider(
+                        providerAuthority = "com.google.android.gms.fonts",
+                        providerPackage = "com.google.android.gms",
+                        certificates = R.array.com_google_android_gms_fonts_certs
+                )
         val fontName = GoogleFont("Poppins")
 
         return remember {
             FontFamily(
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Light
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Normal
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Medium
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.SemiBold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Bold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.ExtraBold
-                ),
-                Font(
-                    googleFont = fontName,
-                    fontProvider = provider,
-                    weight = FontWeight.Black
-                )
+                    Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Light),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.Normal
+                    ),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.Medium
+                    ),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.SemiBold
+                    ),
+                    Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Bold),
+                    Font(
+                            googleFont = fontName,
+                            fontProvider = provider,
+                            weight = FontWeight.ExtraBold
+                    ),
+                    Font(googleFont = fontName, fontProvider = provider, weight = FontWeight.Black)
             )
         }
     }
@@ -257,19 +227,22 @@ class MainActivity : ComponentActivity() {
 // --- Main Authenticated Content Composable ---
 @Composable
 fun MainContent(
-    navController: NavHostController, // Top-level controller for logout
-    authRepository: AuthRepository, // Pass the repository instance
-    userRepository: UserRepository,
-    networkConnectivityObserver: NetworkConnectivityObserver,
-    tokenManager: TokenManager // Added tokenManager parameter
+        navController: NavHostController, // Top-level controller for logout
+        authRepository: AuthRepository, // Pass the repository instance
+        userRepository: UserRepository,
+        networkConnectivityObserver: NetworkConnectivityObserver,
+        tokenManager: TokenManager // Added tokenManager parameter
 ) {
     val nestedNavController = rememberNavController() // Controller for bottom nav sections
     val scope =
-        rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
+            rememberCoroutineScope() // Get a coroutine scope tied to this composable's lifecycle
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val networkStatus = networkConnectivityObserver.observe()
-        .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE).value
+    val networkStatus =
+            networkConnectivityObserver
+                    .observe()
+                    .collectAsState(initial = NetworkConnectivityObserver.Status.AVAILABLE)
+                    .value
     val localSongViewModel: LocalSongViewModel = viewModel()
 
     // Initialize MediaPlayer
@@ -282,7 +255,6 @@ fun MainContent(
             NetworkConnectivityObserver.Status.LOST -> {
                 snackbarHostState.showSnackbar("No network connection")
             }
-
             NetworkConnectivityObserver.Status.AVAILABLE -> {
                 if (snackbarHostState.currentSnackbarData != null) {
                     snackbarHostState.currentSnackbarData?.dismiss()
@@ -290,70 +262,74 @@ fun MainContent(
                     snackbarHostState.showSnackbar("Network connection restored")
                 }
             }
-
             else -> {} // Do nothing for LOSING state
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Black,
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            bottomBar = {
-                Column {
-                    MiniPlayer(
-                        onDeleteClick = { song ->
-                            localSongViewModel.deleteSong(song)
-                        },
-                        viewModel = localSongViewModel,
-                    )
-                    BottomNavigationBar(navController = nestedNavController)
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Black,
+                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                bottomBar = {
+                    Column {
+                        MiniPlayer(
+                                onDeleteClick = { song -> localSongViewModel.deleteSong(song) },
+                                viewModel = localSongViewModel,
+                        )
+                        BottomNavigationBar(navController = nestedNavController)
+                    }
                 }
-            }
         ) { innerPadding ->
             NavHost(
-                navController = nestedNavController,
-                startDestination = BottomNavItem.Home.route,
-                modifier = Modifier.padding(innerPadding)
+                    navController = nestedNavController,
+                    startDestination = BottomNavItem.Home.route,
+                    modifier = Modifier.padding(innerPadding)
             ) {
                 composable(BottomNavItem.Home.route) {
                     HomeScreen(navController = nestedNavController)
                 }
-                composable(BottomNavItem.Library.route) { YourLibraryScreen(/* Pass dependencies */) }
+                composable(BottomNavItem.Library.route) {
+                    YourLibraryScreen(/* Pass dependencies */ )
+                }
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
-                        authRepository = authRepository, // Pass the repository instance
-                        userRepository = userRepository,
-                        networkConnectivityObserver = networkConnectivityObserver, // Add this parameter
-                        onLogout = {
-                            scope.launch { // Use the scope obtained from rememberCoroutineScope()
-                                authRepository.logout()
-                                navController.navigate("auth") { // Navigate back to auth flow
-                                    popUpTo("main") { inclusive = true } // Clear main backstack
-                                    launchSingleTop = true
+                            authRepository = authRepository, // Pass the repository instance
+                            userRepository = userRepository,
+                            networkConnectivityObserver =
+                                    networkConnectivityObserver, // Add this parameter
+                            navController = nestedNavController, // Pass the nested nav controller
+                            onLogout = {
+                                scope.launch { // Use the scope obtained from
+                                    // rememberCoroutineScope()
+                                    authRepository.logout()
+                                    navController.navigate("auth") { // Navigate back to auth flow
+                                        popUpTo("main") { inclusive = true } // Clear main backstack
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
-                        }
                     )
                 }
                 composable("global_song") {
                     val songRepository = remember {
                         createSongRepository(tokenManager) // Use passed tokenManager
                     }
-                    GlobalSong(
-                        navController = nestedNavController,
-                        repository = songRepository
-                    )
+                    GlobalSong(navController = nestedNavController, repository = songRepository)
                 }
                 composable("country_song") {
                     val countrySongRepository = remember {
                         createCountrySongRepository(tokenManager) // Use passed tokenManager
                     }
                     CountrySong(
-                        navController = nestedNavController,
-                        repository = countrySongRepository
+                            navController = nestedNavController,
+                            repository = countrySongRepository
                     )
+                }
+                composable("top_artists") { TopArtistsScreen(navController = nestedNavController) }
+                composable("top_songs") { TopSongsScreen(navController = nestedNavController) }
+                composable("time_listened") {
+                    TimeListenedScreen(navController = nestedNavController)
                 }
             }
         }
