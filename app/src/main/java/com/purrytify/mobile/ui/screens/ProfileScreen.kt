@@ -69,16 +69,20 @@ import coil.request.ImageRequest
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.data.UserRepository
+import com.purrytify.mobile.data.room.AppDatabase
+import com.purrytify.mobile.data.room.ListeningSessionRepository
 import com.purrytify.mobile.ui.components.MapLocationPicker
 import com.purrytify.mobile.utils.CsvExporter
 import com.purrytify.mobile.utils.LocationService
 import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import com.purrytify.mobile.viewmodel.EditProfileState
+import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import com.purrytify.mobile.viewmodel.ProfileUiState
 import com.purrytify.mobile.viewmodel.ProfileViewModel
 import com.purrytify.mobile.viewmodel.ProfileViewModelFactory
 import com.purrytify.mobile.viewmodel.SoundCapsuleViewModel
 import java.io.File
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +106,15 @@ fun ProfileScreen(
                                 )
                 )
 
+        // Add LocalSongViewModel to get song statistics
+        val localSongViewModel: LocalSongViewModel = viewModel()
+
+        // Create listening session repository for listening statistics
+        val listeningSessionRepository = remember {
+                val database = AppDatabase.getDatabase(context)
+                ListeningSessionRepository(database.listeningSessionDao())
+        }
+
         val profileState by profileViewModel.profileUiState.collectAsState()
         val editProfileState by profileViewModel.editProfileState.collectAsState()
         var showEditSheet by remember { mutableStateOf(false) }
@@ -110,6 +123,13 @@ fun ProfileScreen(
         var currentLocation by remember { mutableStateOf<String?>(null) }
         var showLocationPermissionDialog by remember { mutableStateOf(false) }
         var showMapLocationPicker by remember { mutableStateOf(false) }
+
+        // Collect real data from ViewModels
+        val allSongs by localSongViewModel.allSongs.collectAsState()
+        val likedSongs by localSongViewModel.likedSongs.collectAsState()
+
+        // State for listening statistics
+        var totalListenedSongs by remember { mutableStateOf(0) }
 
         val pickImageLauncher =
                 rememberLauncherForActivityResult(
@@ -151,7 +171,19 @@ fun ProfileScreen(
                         }
                 }
 
-        LaunchedEffect(Unit) { profileViewModel.fetchProfile() }
+        LaunchedEffect(Unit) {
+                profileViewModel.fetchProfile()
+
+                // Fetch listening statistics
+                try {
+                        val sessions = listeningSessionRepository.allSessions.first()
+                        // Count unique songs that have been listened to
+                        totalListenedSongs = sessions.distinctBy { it.songId }.size
+                } catch (e: Exception) {
+                        android.util.Log.e("ProfileScreen", "Error fetching listening stats", e)
+                        totalListenedSongs = 0
+                }
+        }
 
         LaunchedEffect(editProfileState) {
                 when (editProfileState) {
@@ -350,9 +382,21 @@ fun ProfileScreen(
                                                                                 Arrangement
                                                                                         .SpaceEvenly
                                                                 ) {
-                                                                        StatItem("135", "SONGS")
-                                                                        StatItem("32", "LIKED")
-                                                                        StatItem("50", "LISTENED")
+                                                                        StatItem(
+                                                                                allSongs.size
+                                                                                        .toString(),
+                                                                                "SONGS"
+                                                                        )
+                                                                        StatItem(
+                                                                                likedSongs.size
+                                                                                        .toString(),
+                                                                                "LIKED"
+                                                                        )
+                                                                        StatItem(
+                                                                                totalListenedSongs
+                                                                                        .toString(),
+                                                                                "LISTENED"
+                                                                        )
                                                                 }
 
                                                                 Spacer(
