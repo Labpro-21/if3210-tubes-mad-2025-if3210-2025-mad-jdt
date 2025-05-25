@@ -1,6 +1,5 @@
 package com.purrytify.mobile.ui.screens
 
-import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,8 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,9 +56,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.purrytify.mobile.R
 import com.purrytify.mobile.data.AuthRepository
-import com.purrytify.mobile.utils.NetworkConnectivityObserver
-import com.purrytify.mobile.utils.LocationService
+import com.purrytify.mobile.data.UserRepository
 import com.purrytify.mobile.ui.components.MapLocationPicker
+import com.purrytify.mobile.utils.LocationService
+import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import com.purrytify.mobile.viewmodel.EditProfileState
 import com.purrytify.mobile.viewmodel.ProfileUiState
 import com.purrytify.mobile.viewmodel.ProfileViewModel
@@ -72,13 +70,19 @@ import java.io.File
 @Composable
 fun ProfileScreen(
     authRepository: AuthRepository,
+    userRepository: UserRepository,
     networkConnectivityObserver: NetworkConnectivityObserver,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val locationService = remember { LocationService(context) }
     val profileViewModel: ProfileViewModel = viewModel(
-        factory = ProfileViewModelFactory(authRepository, networkConnectivityObserver, locationService)
+        factory = ProfileViewModelFactory(
+            authRepository,
+            userRepository,
+            networkConnectivityObserver,
+            locationService
+        )
     )
 
     val profileState by profileViewModel.profileUiState.collectAsState()
@@ -97,13 +101,14 @@ fun ProfileScreen(
     }
 
 
-    
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val fineLocationGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        val coarseLocationGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
-        
+        val fineLocationGranted =
+            permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseLocationGranted =
+            permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+
         if (fineLocationGranted || coarseLocationGranted) {
             // Permission granted, proceed with location detection
             selectedImageUri?.let { uri ->
@@ -356,9 +361,9 @@ fun ProfileScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        
+
                         Spacer(modifier = Modifier.height(12.dp))
-                        
+
                         // Current location display
                         currentLocation?.let {
                             Row(
@@ -387,7 +392,7 @@ fun ProfileScreen(
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                         }
-                        
+
                         // Auto-detect option
                         Row(
                             modifier = Modifier
@@ -400,11 +405,12 @@ fun ProfileScreen(
                                     if (profileViewModel.hasLocationPermission()) {
                                         selectedImageUri?.let { uri ->
                                             val file = File(context.cacheDir, "profile_photo")
-                                            context.contentResolver.openInputStream(uri)?.use { input ->
-                                                file.outputStream().use { output ->
-                                                    input.copyTo(output)
+                                            context.contentResolver.openInputStream(uri)
+                                                ?.use { input ->
+                                                    file.outputStream().use { output ->
+                                                        input.copyTo(output)
+                                                    }
                                                 }
-                                            }
                                             profileViewModel.editProfileWithAutoLocation(file)
                                         } ?: run {
                                             profileViewModel.editProfileWithAutoLocation(null)
@@ -442,9 +448,9 @@ fun ProfileScreen(
                                 )
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         // Embedded Map option
                         Row(
                             modifier = Modifier
@@ -573,7 +579,7 @@ fun ProfileScreen(
                 }
             )
         }
-        
+
         if (showLocationPermissionDialog) {
             AlertDialog(
                 onDismissRequest = { showLocationPermissionDialog = false },
@@ -623,7 +629,7 @@ fun ProfileScreen(
                     } ?: run {
                         profileViewModel.editProfile(countryCode, null)
                     }
-                    
+
                     showMapLocationPicker = false
                 },
                 onDismiss = {

@@ -41,9 +41,9 @@ import androidx.navigation.compose.rememberNavController
 import com.purrytify.mobile.api.ApiClient
 import com.purrytify.mobile.data.AuthRepository
 import com.purrytify.mobile.data.TokenManager
-import com.purrytify.mobile.data.createCountrySongRepository // Added
-import com.purrytify.mobile.data.createSongRepository // Added
-import com.purrytify.mobile.data.room.LocalSong // Added
+import com.purrytify.mobile.data.UserRepository
+import com.purrytify.mobile.data.createCountrySongRepository
+import com.purrytify.mobile.data.createSongRepository
 import com.purrytify.mobile.ui.BottomNavItem
 import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.MiniPlayer
@@ -128,7 +128,8 @@ class MainActivity : ComponentActivity() {
         val authService = ApiClient.createAuthService(retrofit)
         val userService = ApiClient.createUserService(retrofit)
         val authRepository =
-            AuthRepository(tokenManager, authService, userService)
+            AuthRepository(tokenManager, authService)
+        val userRepository = UserRepository(tokenManager, userService)
         val networkConnectivityObserver =
             NetworkConnectivityObserver(applicationContext)
         // --- End Dependencies ---
@@ -182,6 +183,7 @@ class MainActivity : ComponentActivity() {
                             MainContent(
                                 navController = navController,
                                 authRepository = authRepository,
+                                userRepository = userRepository,
                                 networkConnectivityObserver = networkConnectivityObserver,
                                 tokenManager = tokenManager // Pass tokenManager
                             )
@@ -257,6 +259,7 @@ class MainActivity : ComponentActivity() {
 fun MainContent(
     navController: NavHostController, // Top-level controller for logout
     authRepository: AuthRepository, // Pass the repository instance
+    userRepository: UserRepository,
     networkConnectivityObserver: NetworkConnectivityObserver,
     tokenManager: TokenManager // Added tokenManager parameter
 ) {
@@ -321,6 +324,7 @@ fun MainContent(
                 composable(BottomNavItem.Profile.route) {
                     ProfileScreen(
                         authRepository = authRepository, // Pass the repository instance
+                        userRepository = userRepository,
                         networkConnectivityObserver = networkConnectivityObserver, // Add this parameter
                         onLogout = {
                             scope.launch { // Use the scope obtained from rememberCoroutineScope()
