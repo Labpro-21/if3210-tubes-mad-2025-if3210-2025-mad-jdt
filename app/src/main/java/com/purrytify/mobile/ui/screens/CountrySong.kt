@@ -43,6 +43,7 @@ import com.purrytify.mobile.data.room.TopSong
 import com.purrytify.mobile.data.room.CountrySong
 import com.purrytify.mobile.ui.MiniPlayerState
 import com.purrytify.mobile.ui.playSong
+import com.purrytify.mobile.viewmodel.CountrySongViewModel
 
 
 @Composable
@@ -117,44 +118,6 @@ fun CountrySong(
             Text(text = "Puritify • Apr 2025 • 2h 55min", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
 
             Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween 
-            ) {
-                // Download button on the left
-                IconButton(
-                    onClick = { /* Download functionality */ },
-                    modifier = Modifier
-                        .size(56.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.download_for_offline_24),
-                        contentDescription = "Download",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-
-                // Play button on the right
-                IconButton(
-                    onClick = { /* Play functionality */ },
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color(0xFF1DB954), shape = CircleShape)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.play_arrow),
-                        contentDescription = "Play",
-                        tint = Color.Black,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             when {
                 isLoading -> {
@@ -180,7 +143,8 @@ fun CountrySong(
                             Log.d("CountrySong", "Rendering song: ${song.title}")
                             CountrySongItem(
                                 index = index + 1,
-                                song = song
+                                song = song,
+                                viewModel = viewModel
                             )
                         }
                     }
@@ -194,15 +158,17 @@ fun CountrySong(
 @Composable
 fun CountrySongItem(
     index: Int,
-    song: CountrySong
+    song: CountrySong,
+    viewModel: CountrySongViewModel
 ) {
     val context = LocalContext.current
+    val downloadProgress: Map<String, Float> = viewModel.downloadProgress.collectAsState().value
     
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
+                Log.d("CountrySong", "Playing song: ${song.title}, URL: ${song.url}")
                 playSong(song, context)
             }
             .padding(vertical = 8.dp),
@@ -237,6 +203,29 @@ fun CountrySongItem(
         ) {
             Text(text = song.title, fontSize = 16.sp, color = Color.White)
             Text(text = song.artist, fontSize = 14.sp, color = Color.Gray)
+        }
+
+        // Download button
+        IconButton(
+            onClick = {
+                viewModel.downloadSong(song, context)
+            }
+        ) {
+            val progress = downloadProgress[song.id.toString()]
+            if (progress != null) {
+                CircularProgressIndicator(
+                    progress = progress,
+                    color = Color(0xFF1DB954),
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.download_for_offline_24),
+                    contentDescription = "Download",
+                    tint = Color(0xFF1DB954),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         // Add play button

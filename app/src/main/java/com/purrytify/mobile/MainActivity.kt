@@ -498,8 +498,16 @@ fun MainContent(
                     )
                 }
                 composable("country_song") {
+                    val context = LocalContext.current
+                    val localSongDao = remember {
+                        AppDatabase.getDatabase(context).localSongDao()
+                    }
                     val countrySongRepository = remember {
-                        createCountrySongRepository(tokenManager)
+                        createCountrySongRepository(
+                            tokenManager = tokenManager,
+                            localSongDao = localSongDao,
+                            context = context
+                        )
                     }
                     CountrySong(
                         navController = nestedNavController,

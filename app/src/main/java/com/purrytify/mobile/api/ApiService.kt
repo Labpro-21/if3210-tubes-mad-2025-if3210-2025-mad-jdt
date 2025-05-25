@@ -103,5 +103,8 @@ interface CountrySongService {
 
     @GET("api/songs/{songId}")
     suspend fun getCountrySongs(@Path("songId") songId: Int): Response<CountrySong>
-
+    
+    @Streaming
+    @GET
+    suspend fun downloadFile(@Url fileUrl: String): Response<ResponseBody>  // Add this method
 }

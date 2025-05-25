@@ -120,44 +120,6 @@ fun GlobalSong(
             Text(text = "Puritify • Apr 2025 • 2h 55min", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
 
             Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween 
-            ) {
-                // Download button on the left
-                IconButton(
-                    onClick = { /* Download functionality */ },
-                    modifier = Modifier
-                        .size(56.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.download_for_offline_24),
-                        contentDescription = "Download",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-
-                // Play button on the right
-                IconButton(
-                    onClick = { /* Play functionality */ },
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color(0xFF1DB954), shape = CircleShape)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.play_arrow),
-                        contentDescription = "Play",
-                        tint = Color.Black,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // Daftar lagu
             LazyColumn {
@@ -235,14 +197,14 @@ fun SongItem(
             if (progress != null) {
                 CircularProgressIndicator(
                     progress = progress,
-                    color = Color.White,
+                    color = Color(0xFF1DB954),
                     modifier = Modifier.size(24.dp)
                 )
             } else {
                 Icon(
                     painter = painterResource(id = R.drawable.download_for_offline_24),
                     contentDescription = "Download",
-                    tint = Color.White,
+                    tint = Color(0xFF1DB954),
                     modifier = Modifier.size(24.dp)
                 )
             }
