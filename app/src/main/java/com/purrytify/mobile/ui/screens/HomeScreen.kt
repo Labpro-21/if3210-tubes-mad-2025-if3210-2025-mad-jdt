@@ -1,8 +1,13 @@
 package com.purrytify.mobile.ui.screens
 
+import android.app.Activity
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
 import android.widget.ImageView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,11 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,10 +47,13 @@ import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.IconButton
+import com.google.zxing.integration.android.IntentIntegrator
 
 @Composable
 fun HomeScreen(
-    navController: NavHostController
+    navController: NavHostController, // Main navController
+    nestedNavController: NavHostController, // Nested navController  
+    onQrResult: (Int, String?) -> Unit // Callback untuk QR result
 ) {
     val context = LocalContext.current
     val localSongViewModel: LocalSongViewModel = viewModel()
@@ -57,11 +61,39 @@ fun HomeScreen(
     val recentlyPlayedSongs by remember { mutableStateOf(allSongs.take(5)) }
     val newSongs by remember { mutableStateOf(allSongs.takeLast(10)) }
     val isLoading by localSongViewModel.isLoading.collectAsState()
-    val errorMessage by localSongViewModel.errorMessage.collectAsState()
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    fun isCurrentSongLocalSongId(id: Long): Boolean {
-        val song = MiniPlayerState.currentSong
-        return song is LocalSong && song.id == id
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        try {
+            Log.d("ScanQR", "Launcher result received")
+            val intent = result.data
+            val contents = IntentIntegrator.parseActivityResult(result.resultCode, intent)?.contents
+            Log.d("ScanQR", "Scanned contents: $contents")
+            
+            if (contents != null && contents.startsWith("purrytify://song/")) {
+                Log.d("ScanQR", "Valid QR detected")
+                
+                val songIdString = contents.removePrefix("purrytify://song/").split("?")[0]
+                val songId = songIdString.toIntOrNull()
+                val type = if (contents.contains("type=country")) "country" else null
+                
+                Log.d("ScanQR", "Parsed songId: $songId, type: $type")
+                
+                if (songId != null) {
+                    Log.d("ScanQR", "Calling onQrResult callback")
+                    onQrResult(songId, type)
+                } else {
+                    Log.d("ScanQR", "Invalid songId")
+                    errorMessage = "QR tidak valid"
+                }
+            } else {
+                Log.d("ScanQR", "Invalid QR content")
+                errorMessage = "QR tidak valid"
+            }
+        } catch (e: Exception) {
+            Log.e("ScanQR", "Error processing scan result: ${e.message}")
+            errorMessage = "Error: ${e.message}"
+        }
     }
 
     Box(
@@ -109,7 +141,31 @@ fun HomeScreen(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.End
             ) {
-                IconButton(onClick = { navController.navigate("scan_qr") }) {
+                val activity = LocalContext.current as? Activity
+                IconButton(onClick = {
+                    Log.d("ScanQR", "Button clicked")
+                    try {
+                        val activity = context as? Activity
+                        if (activity == null) {
+                            Log.e("ScanQR", "Context is not Activity")
+                            errorMessage = "Error: Context bukan Activity"
+                            return@IconButton
+                        }
+                        
+                        Log.d("ScanQR", "Creating IntentIntegrator")
+                        val integrator = IntentIntegrator(activity)
+                        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+                        integrator.setPrompt("Scan QR lagu Purrytify")
+                        integrator.setOrientationLocked(true)
+                        
+                        Log.d("ScanQR", "Launching scanner")
+                        launcher.launch(integrator.createScanIntent())
+                        Log.d("ScanQR", "Scanner launched")
+                    } catch (e: Exception) {
+                        Log.e("ScanQR", "Error launching scanner: ${e.message}")
+                        errorMessage = "Error: ${e.message}"
+                }
+                }) {
                     Icon(
                         imageVector = Icons.Filled.QrCodeScanner,
                         contentDescription = "Scan QR",
@@ -148,7 +204,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .clickable { 
-                                        navController.navigate("global_song")  // Navigate to GlobalSong screen
+                                        nestedNavController.navigate("global_song")  // Nested navigation
                                     }
                             ) {
                                 Image(
@@ -166,7 +222,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .clickable {
-                                        navController.navigate("country_song")  // Navigate to GlobalSong screen
+                                        nestedNavController.navigate("country_song")  // Nested navigation
                                     }
                             ) {
                                 Image(
