@@ -3,14 +3,12 @@ package com.purrytify.mobile.data
 import android.util.Log
 import com.purrytify.mobile.api.AuthService
 import com.purrytify.mobile.api.LoginRequest
-import com.purrytify.mobile.api.ProfileResponse
 import com.purrytify.mobile.api.RefreshTokenRequest
 import com.purrytify.mobile.api.RefreshTokenResponse
-import kotlinx.coroutines.flow.first
 
 class AuthRepository(
     private val tokenManager: TokenManager,
-    private val authService: AuthService
+    private val authService: AuthService,
 ) {
 
     suspend fun login(email: String, password: String): Boolean {
@@ -56,33 +54,6 @@ class AuthRepository(
             response.body()
         } else {
             null
-        }
-    }
-
-    suspend fun getProfile(): Result<ProfileResponse> {
-        val token = tokenManager.accessToken.first()
-        if (token == null) {
-            Log.w("AuthRepository", "Cannot get profile, access token is null.")
-            return Result.failure(Exception("User not logged in"))
-        }
-        Log.d("AuthRepository", "Fetching profile with token: Bearer $token")
-        return try {
-            val response = authService.getProfile("Bearer $token")
-            if (response.isSuccessful && response.body() != null) {
-                Log.d("AuthRepository", "Profile fetched successfully: ${response.body()}")
-                Result.success(response.body()!!)
-            } else {
-                Log.e(
-                    "AuthRepository",
-                    "Get profile failed: Code: ${response.code()}, Message: ${response.message()}, Body: ${
-                        response.errorBody()?.string()
-                    }"
-                )
-                Result.failure(Exception("Failed to fetch profile: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Log.e("AuthRepository", "Exception during getProfile: ${e.message}", e)
-            Result.failure(e)
         }
     }
 }

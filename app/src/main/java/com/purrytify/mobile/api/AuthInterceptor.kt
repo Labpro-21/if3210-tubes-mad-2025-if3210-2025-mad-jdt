@@ -10,7 +10,8 @@ import java.net.HttpURLConnection
 
 class AuthInterceptor(
     private val tokenManager: TokenManager,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val onLogoutRequired: (() -> Unit)? = null
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -37,8 +38,10 @@ class AuthInterceptor(
                 }
 
                 try {
+                    Log.d("AuthInterceptor", "Refreshing token with refresh token: $refreshToken")
                     val refreshResponse =
                         authService.refreshToken(RefreshTokenRequest(refreshToken))
+                    Log.d("AuthInterceptor", "Token refresh response: $refreshResponse")
                     if (refreshResponse.isSuccessful && refreshResponse.body() != null) {
                         val tokens = refreshResponse.body()!!
                         tokenManager.saveTokens(tokens.accessToken, tokens.refreshToken)
@@ -46,15 +49,21 @@ class AuthInterceptor(
                             "AuthInterceptor",
                             "Token refresh successful, retrying original request"
                         )
-
-                        // Retry original request with new token
                         chain.proceed(addAuthHeader(originalRequest))
                     } else {
-                        Log.d("AuthInterceptor", "Token refresh failed")
+                        Log.d("AuthInterceptor", "Token refresh failed, clearing tokens and triggering logout")
+                        // Clear invalid tokens when refresh fails
+                        tokenManager.clearTokensSync()
+                        // Trigger logout callback if available
+                        onLogoutRequired?.invoke()
                         initialResponse
                     }
                 } catch (e: Exception) {
-                    Log.e("AuthInterceptor", "Error during token refresh", e)
+                    Log.e("AuthInterceptor", "Error during token refresh, clearing tokens and triggering logout", e)
+                    // Clear tokens on exception as well
+                    tokenManager.clearTokensSync()
+                    // Trigger logout callback if available
+                    onLogoutRequired?.invoke()
                     initialResponse
                 }
             }
