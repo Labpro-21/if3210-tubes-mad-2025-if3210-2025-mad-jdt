@@ -28,6 +28,11 @@ class CountrySongRepository(private val countrySongService: CountrySongService) 
             Result.failure(e)
         }
     }
+
+    suspend fun getCountrySongById(songId: Int): CountrySong? {
+        val response = countrySongService.getCountrySongs(songId)
+        return if (response.isSuccessful) response.body() else null
+    }
 }
 
 // Example of how to create the repository:

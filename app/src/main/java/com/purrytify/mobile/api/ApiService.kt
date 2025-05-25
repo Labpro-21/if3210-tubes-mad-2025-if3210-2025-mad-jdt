@@ -84,11 +84,15 @@ interface SongService {
     @GET("api/top-songs/global")
     suspend fun getTopSongs(): Response<List<TopSong>>
 
-    @GET("api/top-songs/global/{songId}")
+    @GET("api/songs/{songId}")
     suspend fun getTopSongs(@Path("songId") songId: Int): Response<TopSong>
 }
 
 interface CountrySongService {
     @GET("api/top-songs/ID")
     suspend fun getCountrySongs(): Response<List<CountrySong>>
+
+    @GET("api/songs/{songId}")
+    suspend fun getCountrySongs(@Path("songId") songId: Int): Response<CountrySong>
+
 }

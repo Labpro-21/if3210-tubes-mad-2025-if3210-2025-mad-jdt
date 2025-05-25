@@ -60,10 +60,19 @@ import com.purrytify.mobile.utils.NetworkConnectivityObserver
 import com.purrytify.mobile.viewmodel.LocalSongViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import android.R.attr.type
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.purrytify.mobile.data.SongRepository
+import com.purrytify.mobile.data.CountrySongRepository
 import com.purrytify.mobile.ui.ScanQrScreen
+import com.purrytify.mobile.ui.playSong
+import com.purrytify.mobile.data.room.TopSong
+import com.purrytify.mobile.data.room.CountrySong
+
 
 // Composition Local for Poppins Font
 val LocalPoppinsFont = staticCompositionLocalOf<FontFamily> {
@@ -154,6 +163,21 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     this@MainActivity.navController = navController
 
+                    LaunchedEffect(Unit) {
+                        val data = intent?.data
+                        if (data != null && data.scheme == "purrytify" && data.host == "song") {
+                            val songId = data.lastPathSegment?.toIntOrNull()
+                            val type = data.getQueryParameter("type")
+                            if (songId != null) {
+                                if (type == "country") {
+                                    navController.navigate("country_song_player/$songId")
+                                } else {
+                                    navController.navigate("global_song_player/$songId")
+                                }
+                            }
+                        }
+                    }
+
                     val startDestination = remember {
                         if (checkInitialAuthState(tokenManager)) "main" else "auth"
                     }
@@ -209,10 +233,72 @@ class MainActivity : ComponentActivity() {
                             val songId = navBackStackEntry.arguments?.getInt("songId")
                             if (songId != null) {
                                 val songRepository = remember { createSongRepository(tokenManager) }
-                                GlobalSong(
-                                    navController = navController,
-                                    repository = songRepository
-                                )
+                                val context = LocalContext.current
+                                val song by produceState<TopSong?>(initialValue = null, songId) {
+                                    Log.d("MiniPlayer", "produceState: fetching songId=$songId")
+                                    value = songRepository.getSongById(songId)
+                                    Log.d("MiniPlayer", "produceState: result=${value?.title}")
+                                }
+
+                                LaunchedEffect(song) {
+                                    if (song != null) {
+                                        Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+                                        playSong(song!!, context)
+                                        navController.navigate("main") {
+                                            popUpTo(route.toString()) { inclusive = true }
+                                        }
+                                    }
+                                }
+
+                                if (song != null) {
+                                    GlobalSongPlayer(
+                                        navController = navController,
+                                        repository = songRepository,
+                                        songId = songId
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
+                            }
+                        }
+
+                        composable(
+                            route = "country_song_player/{songId}",
+                            arguments = listOf(navArgument("songId") { type = NavType.IntType })
+                        ) { navBackStackEntry ->
+                            val songId = navBackStackEntry.arguments?.getInt("songId")
+                            if (songId != null) {
+                                val countrySongRepository = remember { createCountrySongRepository(tokenManager) }
+                                val context = LocalContext.current
+                                val song by produceState<CountrySong?>(initialValue = null, songId) {
+                                    Log.d("MiniPlayer", "produceState: fetching songId=$songId")
+                                    value = countrySongRepository.getCountrySongById(songId)
+                                    Log.d("MiniPlayer", "produceState: result=${value?.title}")
+                                }
+                        
+                                LaunchedEffect(song) {
+                                    if (song != null) {
+                                        Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+                                        playSong(song!!, context)
+                                        navController.navigate("main") {
+                                            popUpTo(route.toString()) { inclusive = true }
+                                        }
+                                    }
+                                }
+
+                                if (song != null) {
+                                    CountrySongPlayer(
+                                        navController = navController,
+                                        repository = countrySongRepository,
+                                        songId = songId
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
                             }
                         }
 
@@ -235,8 +321,13 @@ class MainActivity : ComponentActivity() {
         val data = intent?.data
         if (data != null && data.scheme == "purrytify" && data.host == "song") {
             val songId = data.lastPathSegment?.toIntOrNull()
+            val type = data.getQueryParameter("type") // misal: purrytify://song/123?type=country
             if (songId != null) {
-                navController?.navigate("global_song_player/$songId")
+                if (type == "country") {
+                    navController?.navigate("country_song_player/$songId")
+                } else {
+                    navController?.navigate("global_song_player/$songId")
+                }
             }
         }
     }
@@ -399,4 +490,46 @@ fun MainContent(
             }
         }
     }
+}
+
+@Composable
+fun GlobalSongPlayer(
+    navController: NavHostController,
+    repository: SongRepository,
+    songId: Int
+) {
+    val context = LocalContext.current
+    val song by produceState<TopSong?>(initialValue = null, songId) {
+        value = repository.getSongById(songId)
+    }
+
+    LaunchedEffect(song) {
+        if (song != null) {
+            Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+            playSong(song!!, context)
+        }
+    }
+
+    // ...UI player untuk TopSong...
+}
+
+@Composable
+fun CountrySongPlayer(
+    navController: NavHostController,
+    repository: CountrySongRepository,
+    songId: Int
+) {
+    val context = LocalContext.current
+    val song by produceState<CountrySong?>(initialValue = null, songId) {
+        value = repository.getCountrySongById(songId)
+    }
+
+    LaunchedEffect(song) {
+        if (song != null) {
+            Log.d("MiniPlayer", "LaunchedEffect song type: ${song!!::class.simpleName}")
+            playSong(song!!, context)
+        }
+    }
+
+    // ...UI player untuk CountrySong (bisa sama dengan GlobalSongPlayer)...
 }
