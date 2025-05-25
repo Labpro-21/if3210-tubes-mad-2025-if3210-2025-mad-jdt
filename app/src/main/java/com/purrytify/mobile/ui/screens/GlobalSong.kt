@@ -145,6 +145,7 @@ fun SongItem(
     navController: NavController
 ) {
     val context = LocalContext.current
+    val topSongs by viewModel.topSongs.collectAsState()
     val downloadProgress: Map<String, Float> = viewModel.downloadProgress.collectAsState().value
     
     Row(
@@ -152,6 +153,7 @@ fun SongItem(
             .fillMaxWidth()
             .clickable {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
+                MiniPlayerState.setQueue(topSongs, index - 1, "global")
                 playSong(song, context)
             }
             .padding(vertical = 8.dp),
@@ -214,6 +216,7 @@ fun SongItem(
         IconButton(
             onClick = {
                 Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
+                MiniPlayerState.setQueue(topSongs, index - 1, "global")
                 playSong(song, context)
             }
         ) {

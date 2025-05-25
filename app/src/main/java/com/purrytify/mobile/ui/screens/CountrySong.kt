@@ -162,13 +162,15 @@ fun CountrySongItem(
     viewModel: CountrySongViewModel
 ) {
     val context = LocalContext.current
-    val downloadProgress: Map<String, Float> = viewModel.downloadProgress.collectAsState().value
+    val countrySongs by viewModel.countrySongs.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
     
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
                 Log.d("CountrySong", "Playing song: ${song.title}, URL: ${song.url}")
+                MiniPlayerState.setQueue(countrySongs, index - 1, "country")
                 playSong(song, context)
             }
             .padding(vertical = 8.dp),
@@ -183,7 +185,6 @@ fun CountrySongItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Add song artwork
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(song.artwork)
@@ -212,9 +213,9 @@ fun CountrySongItem(
             }
         ) {
             val progress = downloadProgress[song.id.toString()]
-            if (progress != null) {
-                CircularProgressIndicator(
-                    progress = progress,
+            if (progress != null && progress > 0f) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    progress = { progress },
                     color = Color(0xFF1DB954),
                     modifier = Modifier.size(24.dp)
                 )
@@ -228,10 +229,11 @@ fun CountrySongItem(
             }
         }
 
-        // Add play button
+        // Play button
         IconButton(
             onClick = {
-                Log.d("GlobalSong", "Playing song: ${song.title}, URL: ${song.url}")
+                Log.d("CountrySong", "Playing song: ${song.title}, URL: ${song.url}")
+                MiniPlayerState.setQueue(countrySongs, index - 1, "country")
                 playSong(song, context)
             }
         ) {

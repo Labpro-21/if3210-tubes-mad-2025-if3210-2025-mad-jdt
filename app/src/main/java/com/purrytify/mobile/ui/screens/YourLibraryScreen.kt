@@ -779,13 +779,19 @@ fun LocalSongItem(
     onDeleteClick: () -> Unit,
     onLikeToggle: () -> Unit
 ) {
-    var showOptions by remember { mutableStateOf(false) }
     val context = LocalContext.current
-
+    val localSongViewModel: LocalSongViewModel = viewModel()
+    val allSongs by localSongViewModel.allSongs.collectAsState()
+    var showOptions by remember { mutableStateOf(false) }
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onPlayClick() }
+            .clickable { 
+                val currentIndex = allSongs.indexOfFirst { it.id == song.id }
+                MiniPlayerState.setQueue(allSongs, currentIndex, "local")
+                onPlayClick() 
+            }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -906,6 +912,21 @@ fun LocalSongItem(
                     }
                 )
             }
+        }
+
+        IconButton(onClick = {
+            val currentIndex = allSongs.indexOfFirst { it.id == song.id }
+            MiniPlayerState.setQueue(allSongs, currentIndex, "local")
+            onPlayClick()
+        }) {
+            Icon(
+                painter = painterResource(
+                    id = if (isPlaying) R.drawable.pause else R.drawable.play_circle
+                ),
+                contentDescription = if (isPlaying) "Pause" else "Play",
+                tint = Color(0xFF1DB954),
+                modifier = Modifier.size(28.dp)
+            )
         }
     }
 }
