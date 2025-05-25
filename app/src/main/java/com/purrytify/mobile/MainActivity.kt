@@ -44,6 +44,7 @@ import com.purrytify.mobile.data.TokenManager
 import com.purrytify.mobile.data.UserRepository
 import com.purrytify.mobile.data.createCountrySongRepository
 import com.purrytify.mobile.data.createSongRepository
+import com.purrytify.mobile.data.room.AppDatabase
 import com.purrytify.mobile.ui.BottomNavItem
 import com.purrytify.mobile.ui.BottomNavigationBar
 import com.purrytify.mobile.ui.MiniPlayer
@@ -480,8 +481,16 @@ fun MainContent(
                     )
                 }
                 composable("global_song") {
+                    val context = LocalContext.current
+                    val localSongDao = remember {
+                        AppDatabase.getDatabase(context).localSongDao()
+                    }
                     val songRepository = remember {
-                        createSongRepository(tokenManager)
+                        createSongRepository(
+                            tokenManager = tokenManager,
+                            localSongDao = localSongDao,
+                            context = context
+                        )
                     }
                     GlobalSong(
                         navController = nestedNavController,
