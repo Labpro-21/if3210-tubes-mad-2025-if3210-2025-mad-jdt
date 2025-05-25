@@ -9,16 +9,18 @@ data class CountrySong(
     val duration: String,
     val country: String,
     val rank: Int
-){
-    fun toLocalSong(): LocalSong {
+) {
+    fun toLocalSong(downloadedFilePath: String? = null): LocalSong {
         return LocalSong(
-            id = id.toLong(), // Convert id to Long for LocalSong
+            id = 0, 
             title = title,
             artist = artist,
-            filePath = url, // Use the URL as filePath
+            filePath = downloadedFilePath ?: url,
             artworkPath = artwork,
-            duration = duration.toLongOrNull() ?: 0L, // Convert duration to Long, default to 0 if parsing fails
-            isLiked = false
+            duration = duration.toLongOrNull() ?: 0L,
+            isLiked = false,
+            isDownloaded = downloadedFilePath != null,
+            topSongId = id // Track the original CountrySong ID
         )
     }
 }
